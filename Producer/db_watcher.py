@@ -1,6 +1,7 @@
 import time
 import logging as lg
 import sys
+import os
 import mysql.connector
 
 
@@ -11,11 +12,11 @@ def db_watcher():
     while retry:
         try:
             conn = mysql.connector.connect(
-                host="host.docker.internal",
-                port="3306",
-                user="root",
-                password="user",
-                database="classicmodels",
+                host=os.getenv("MYSQL_HOST"),
+                port=os.getenv("MYSQL_PORT"),
+                user=os.getenv("MYSQL_USER"),
+                password=os.getenv("MYSQL_PASSWORD"),
+                database=os.getenv("MYSQL_DATABASE"),
             )
             if conn.is_connected():
                 retry = False
