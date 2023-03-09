@@ -1,0 +1,4 @@
+confluent-kafka==2.0.2
+mysql-connector-python==8.0.32
+mysqlclient==2.1.1
+protobuf==3.20.3

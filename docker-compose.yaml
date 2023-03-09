@@ -1,9 +1,23 @@
 services:
   persistence:
-    image: postgres:latest
-    environment:
-      POSTGRES_PASSWORD: password
-      POSTGRES_USER: user
-      POSTGRES_DB: db
+    image: persistence:latest
+    hostname: persistence
+    build: ./persistence
+    volumes:
+      - ./persistence:/database
     ports:
-      - 5432:5432
+      - 3306:3306
+    healthcheck:
+            test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+            timeout: 20s
+            retries: 10
+
+  producer:
+    image: producer:latest
+    hostname: producer
+    build: ./producer
+    depends_on:
+      persistence:
+        condition: service_healthy
+    ports:
+      - 8080:8080
