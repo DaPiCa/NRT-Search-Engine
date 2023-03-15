@@ -1,4 +1,5 @@
-# pylint: disable=import-error
+# pylint: disable=import-error, line-too-long
+
 import time
 import logging as lg
 import logging.config as lg_conf
@@ -16,7 +17,20 @@ from pymysqlreplication.row_event import (
 RETRY_LIMIT = 5
 
 
-def connection_manager(root=False):
+def connection_manager(
+    root: bool = False,
+) -> mysql.connector.connection.MySQLConnection or None:
+    """
+    Crea una conexión a la base de datos MySQL utilizando los datos de conexión proporcionados por las variables de entorno
+    MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_ROOT_USER (si root=True), MYSQL_PASSWORD (si root=False), MYSQL_ROOT_PASSWORD (si root=True) y MYSQL_DATABASE.
+
+    Args:
+    - root (bool, opcional): Si es True, se utiliza el usuario y contraseña de root definidos en las variables de entorno.
+
+    Returns:
+    - mysql.connector.connection.MySQLConnection or None: Devuelve una conexión a la base de datos si se ha podido establecer la conexión, en caso contrario devuelve None.
+
+    """
     connection = None
     try:
         connection = mysql.connector.connect(
@@ -34,7 +48,16 @@ def connection_manager(root=False):
     return connection
 
 
-def insert_event(event):
+def insert_event(event: WriteRowsEvent) -> None:
+    """
+    Función que se encarga de manejar los eventos de inserción de datos.
+
+    Args:
+        event (WriteRowsEvent): Evento que representa una inserción de datos en la base de datos.
+
+    Returns:
+        None
+    """
     lg.info("Received Insert Event")
     for row in event.rows:
         lg.info("\tInserted row:")
@@ -42,7 +65,16 @@ def insert_event(event):
             lg.info("\t\t%s : %s", key, row["values"][key])
 
 
-def update_event(event):
+def update_event(event: UpdateRowsEvent) -> None:
+    """
+    Función que se encarga de manejar los eventos de actualización de datos.
+
+    Args:
+        event (UpdateRowsEvent): Evento que representa una actualización de datos en la base de datos.
+
+    Returns:
+        None
+    """
     lg.info("Received Update Event")
     for row in event.rows:
         lg.info("\tUpdated row:")
@@ -55,7 +87,16 @@ def update_event(event):
             )
 
 
-def delete_event(event):
+def delete_event(event: DeleteRowsEvent) -> None:
+    """
+    Función que se encarga de manejar los eventos de eliminación de datos.
+
+    Args:
+        event (DeleteRowsEvent): Evento que representa una eliminación de datos en la base de datos.
+
+    Returns:
+        None
+    """
     lg.info("Received Delete Event")
     for row in event.rows:
         lg.info("\tDeleted row:")
@@ -63,7 +104,16 @@ def delete_event(event):
             lg.info("\t\t%s : %s", key, row["values"][key])
 
 
-def permissions_check(connection):
+def permissions_check(connection: mysql.connector.connection.MySQLConnection) -> bool:
+    """
+    Comprueba si el usuario actual tiene los permisos necesarios para realizar una replicación.
+
+    Args:
+        connection: Objeto de tipo MySQLConnection establecido a la base de datos.
+
+    Returns:
+        permission (bool): True si el usuario actual tiene los permisos necesarios, False en caso contrario.
+    """
     permission = False
     with connection.cursor() as cursor:
         cursor.execute("SHOW GRANTS FOR CURRENT_USER()")
@@ -75,7 +125,10 @@ def permissions_check(connection):
     return permission
 
 
-def permission_grant():
+def permission_grant() -> None:
+    """
+    Otorga permisos de replicación al usuario actual.
+    """
     lg.info(
         "User %s does not have permission to replicate, granting as root user...",
         os.getenv("MYSQL_USER"),
@@ -86,12 +139,15 @@ def permission_grant():
         sys.exit(1)
     with temporal_connection.cursor() as cursor:
         user = os.getenv("MYSQL_USER")
-        cursor.execute(f"GRANT REPLICATION CLIENT ON *.* TO '{user}'@'%';")
+        cursor.execute(f"GRANT REPLICATION CLIENT ON . TO '{user}'@'%';")
         temporal_connection.commit()
-    temporal_connection.close()
+        temporal_connection.close()
 
 
-def listen_for_changes():
+def listen_for_changes() -> None:
+    """
+    Escucha y procesa los eventos en el log binario de MySQL.
+    """
     lg.info("Listening for changes...")
 
     mysql_settings = {
@@ -114,7 +170,7 @@ def listen_for_changes():
         start_timestamp = calendar.timegm(time.gmtime())
 
         for event in stream:
-            if event.timestamp > start_timestamp and event.rows is not None:  # type: ignore
+            if event.timestamp > start_timestamp and event.rows is not None:
                 if isinstance(event, WriteRowsEvent):
                     insert_event(event)
 
@@ -128,7 +184,10 @@ def listen_for_changes():
             stream.close()
 
 
-def main():
+def main() -> None:
+    """
+    Función principal que establece la conexión con la base de datos y comienza a escuchar por eventos de replicación.
+    """
     contador_reintentos = 0
     connection = None
     while contador_reintentos < RETRY_LIMIT:
@@ -143,7 +202,7 @@ def main():
                 break
             finally:
                 connection.close()
-        contador_reintentos += 1
+                contador_reintentos += 1
     if connection is None or not connection.is_connected():
         lg.error("Connection failed, exiting")
         sys.exit(1)
