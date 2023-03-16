@@ -13,8 +13,24 @@ from pymysqlreplication.row_event import (
     UpdateRowsEvent,
     WriteRowsEvent,
 )
+from confluent_kafka import Producer
 
 RETRY_LIMIT = 5
+
+def send_topic(topic: str, message: str) -> None:
+    """
+    Sends a message to a Kafka topic.
+
+    Args:
+        topic (str): topic to which the message will be sent.
+        message (str): message to be sent.
+
+    Returns:
+        None
+    """
+    producer = Producer({"bootstrap.servers": os.getenv("KAFKA_HOST")})
+    producer.produce(topic, message)
+    producer.flush()
 
 
 def connection_manager(
