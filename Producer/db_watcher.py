@@ -21,14 +21,14 @@ def connection_manager(
     root: bool = False,
 ) -> mysql.connector.connection.MySQLConnection or None:
     """
-    Crea una conexión a la base de datos MySQL utilizando los datos de conexión proporcionados por las variables de entorno
-    MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_ROOT_USER (si root=True), MYSQL_PASSWORD (si root=False), MYSQL_ROOT_PASSWORD (si root=True) y MYSQL_DATABASE.
+    Creates a connection to the MySQL database using the connection parameters provided by the environment variables
+    MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_ROOT_USER (if root=True), MYSQL_PASSWORD (if root=False), MYSQL_ROOT_PASSWORD (if root=True) and MYSQL_DATABASE.
 
     Args:
-    - root (bool, opcional): Si es True, se utiliza el usuario y contraseña de root definidos en las variables de entorno.
+    - root (bool, optional): if True, the root user and password defined in the environment variables are used.
 
     Returns:
-    - mysql.connector.connection.MySQLConnection or None: Devuelve una conexión a la base de datos si se ha podido establecer la conexión, en caso contrario devuelve None.
+    - mysql.connector.connection.MySQLConnection or None: Returns a connection to the database if the connection could be established, otherwise returns None.
 
     """
     connection = None
@@ -45,15 +45,18 @@ def connection_manager(
     except mysql.connector.Error as err:
         lg.error("Connection failed, retrying in 5 seconds.\n\tError: %s", err)
         time.sleep(5)
+    except TypeError as err:
+        lg.error("Environment variables not set, exiting.\n\tError: %s", err)    
+        sys.exit(1)
     return connection
 
 
 def insert_event(event: WriteRowsEvent) -> None:
     """
-    Función que se encarga de manejar los eventos de inserción de datos.
+    Function in charge of handling data insertion events.
 
     Args:
-        event (WriteRowsEvent): Evento que representa una inserción de datos en la base de datos.
+        event (WriteRowsEvent): event that represents a data insertion in the database.
 
     Returns:
         None
@@ -67,10 +70,10 @@ def insert_event(event: WriteRowsEvent) -> None:
 
 def update_event(event: UpdateRowsEvent) -> None:
     """
-    Función que se encarga de manejar los eventos de actualización de datos.
+    Function that is responsible for handling data update events.
 
     Args:
-        event (UpdateRowsEvent): Evento que representa una actualización de datos en la base de datos.
+        event (UpdateRowsEvent): event that represents a data update in the database.
 
     Returns:
         None
@@ -80,7 +83,7 @@ def update_event(event: UpdateRowsEvent) -> None:
         lg.info("\tUpdated row:")
         for key in row["after_values"]:
             lg.info(
-                "Value %s: %s => %s",
+                "\t\tValue %s: %s => %s",
                 key,
                 row["before_values"][key],
                 row["after_values"][key],
@@ -89,10 +92,10 @@ def update_event(event: UpdateRowsEvent) -> None:
 
 def delete_event(event: DeleteRowsEvent) -> None:
     """
-    Función que se encarga de manejar los eventos de eliminación de datos.
+    Function that is responsible for handling data deletion events.
 
     Args:
-        event (DeleteRowsEvent): Evento que representa una eliminación de datos en la base de datos.
+        event (DeleteRowsEvent): event that represents a data deletion in the database.
 
     Returns:
         None
@@ -106,13 +109,13 @@ def delete_event(event: DeleteRowsEvent) -> None:
 
 def permissions_check(connection: mysql.connector.connection.MySQLConnection) -> bool:
     """
-    Comprueba si el usuario actual tiene los permisos necesarios para realizar una replicación.
+    Checks if the current user has the necessary permissions to perform a replication.
 
     Args:
-        connection: Objeto de tipo MySQLConnection establecido a la base de datos.
+        connection: object of type MySQLConnection set to the database.
 
     Returns:
-        permission (bool): True si el usuario actual tiene los permisos necesarios, False en caso contrario.
+        permission (bool): true if the current user has the necessary permissions, False otherwise.
     """
     permission = False
     with connection.cursor() as cursor:
@@ -127,7 +130,7 @@ def permissions_check(connection: mysql.connector.connection.MySQLConnection) ->
 
 def permission_grant() -> None:
     """
-    Otorga permisos de replicación al usuario actual.
+    Grants replication permissions to the current user.
     """
     lg.info(
         "User %s does not have permission to replicate, granting as root user...",
@@ -146,7 +149,7 @@ def permission_grant() -> None:
 
 def listen_for_changes() -> None:
     """
-    Escucha y procesa los eventos en el log binario de MySQL.
+    Listens and processes events in the MySQL binary log.
     """
     lg.info("Listening for changes...")
 
@@ -186,7 +189,9 @@ def listen_for_changes() -> None:
 
 def main() -> None:
     """
-    Función principal que establece la conexión con la base de datos y comienza a escuchar por eventos de replicación.
+    Attempts to establish a connection with a database and listen for changes. If the connection fails or 
+    permission to access the database is denied, the function will retry a limited number of times before 
+    ultimately failing and exiting.
     """
     contador_reintentos = 0
     connection = None
