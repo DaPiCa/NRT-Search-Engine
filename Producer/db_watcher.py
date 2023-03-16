@@ -119,7 +119,7 @@ def permissions_check(connection: mysql.connector.connection.MySQLConnection) ->
         cursor.execute("SHOW GRANTS FOR CURRENT_USER()")
         results = cursor.fetchall()
         for row in results:
-            if "REPLICATION CLIENT" in row[0]:
+            if "REPLICATION SLAVE" in row[0]:
                 permission = True
                 break
     return permission
@@ -139,7 +139,7 @@ def permission_grant() -> None:
         sys.exit(1)
     with temporal_connection.cursor() as cursor:
         user = os.getenv("MYSQL_USER")
-        cursor.execute(f"GRANT REPLICATION CLIENT ON . TO '{user}'@'%';")
+        cursor.execute(f"GRANT REPLICATION SLAVE ON *.* TO '{user}'@'%';")
         temporal_connection.commit()
         temporal_connection.close()
 
