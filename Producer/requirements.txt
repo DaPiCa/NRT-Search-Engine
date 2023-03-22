@@ -1,6 +1,5 @@
 certifi==2022.9.24
 cffi==1.15.1
-confluent-kafka==2.0.2
 cryptography==39.0.2
 mysql-connector-python==8.0.32
 mysql-replication==0.31
@@ -8,3 +7,4 @@ protobuf==3.20.3
 pycparser==2.21
 PyMySQL==1.0.2
 wincertstore==0.2
+kafka-python==2.0.2

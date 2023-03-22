@@ -4,6 +4,7 @@ import time
 import logging as lg
 import logging.config as lg_conf
 import sys
+import json
 import os
 import calendar
 import mysql.connector
@@ -13,11 +14,27 @@ from pymysqlreplication.row_event import (
     UpdateRowsEvent,
     WriteRowsEvent,
 )
-from confluent_kafka import Producer
+from kafka import KafkaProducer
+from kafka.producer.future import FutureRecordMetadata
 
 RETRY_LIMIT = 5
 
-def send_topic(topic: str, message: str) -> None:
+
+def create_producer() -> KafkaProducer:
+    """
+    Creates a Kafka producer.
+
+    Returns:
+    - confluent_kafka.Producer: Kafka producer.
+    """
+    configuration = {
+        "bootstrap_servers": f"{os.getenv('KAFKA_BROKER')}:{os.getenv('KAFKA_BROKER_PORT')}",
+        "client_id": "producer-python"
+    }
+    return KafkaProducer(**configuration)
+
+
+def send_topic(data: str, producer: KafkaProducer) -> None:
     """
     Sends a message to a Kafka topic.
 
@@ -28,9 +45,15 @@ def send_topic(topic: str, message: str) -> None:
     Returns:
         None
     """
-    producer = Producer({"bootstrap.servers": os.getenv("KAFKA_HOST")})
-    producer.produce(topic, message)
-    producer.flush()
+    topics = {
+        "insert": os.getenv("TOPIC_INSERT"),
+        "update": os.getenv("TOPIC_UPDATE"),
+        "delete": os.getenv("TOPIC_DELETE"),
+    }
+    future: FutureRecordMetadata = producer.send(topics[json.loads(data)["type"]], data.encode("utf-8"), timestamp_ms=calendar.timegm(time.gmtime()))
+    future.get(timeout=60)
+    if future.is_done:
+        lg.info("Message sent")
 
 
 def connection_manager(
@@ -62,12 +85,12 @@ def connection_manager(
         lg.error("Connection failed, retrying in 5 seconds.\n\tError: %s", err)
         time.sleep(5)
     except TypeError as err:
-        lg.error("Environment variables not set, exiting.\n\tError: %s", err)    
+        lg.error("Environment variables not set, exiting.\n\tError: %s", err)
         sys.exit(1)
     return connection
 
 
-def insert_event(event: WriteRowsEvent) -> None:
+def insert_event(event: WriteRowsEvent) -> str:
     """
     Function in charge of handling data insertion events.
 
@@ -82,9 +105,26 @@ def insert_event(event: WriteRowsEvent) -> None:
         lg.info("\tInserted row:")
         for key in row["values"]:
             lg.info("\t\t%s : %s", key, row["values"][key])
+    
+    data = []
+    if len(event.rows) > 0:
+        for row in event.rows:
+            insert = {
+                "values": row["values"],
+            }
+            data.append(insert)
+    else:
+        insert = {
+            "values": event.rows[0]["values"],
+        }
+        data.append(insert)
+    
+    json_message = {"type": "insert", "data": data, "timestamp": time.time()}
+    
+    return json.dumps(json_message)
 
 
-def update_event(event: UpdateRowsEvent) -> None:
+def update_event(event: UpdateRowsEvent) -> str:
     """
     Function that is responsible for handling data update events.
 
@@ -104,9 +144,27 @@ def update_event(event: UpdateRowsEvent) -> None:
                 row["before_values"][key],
                 row["after_values"][key],
             )
+    data = []
+    if(len(event.rows) > 0):
+        for row in event.rows:
+            update = {
+                "before": row["before_values"],
+                "after": row["after_values"]
+            }
+            data.append(update)
+    else:
+        update = {
+            "before": event.rows[0]["before_values"],
+            "after": event.rows[0]["after_values"]
+        }
+        data.append(update)
+    
+    json_message = {"type": "update", "data": data, "timestamp": time.time()}
+
+    return json.dumps(json_message)
 
 
-def delete_event(event: DeleteRowsEvent) -> None:
+def delete_event(event: DeleteRowsEvent) -> str:
     """
     Function that is responsible for handling data deletion events.
 
@@ -121,6 +179,23 @@ def delete_event(event: DeleteRowsEvent) -> None:
         lg.info("\tDeleted row:")
         for key in row["values"]:
             lg.info("\t\t%s : %s", key, row["values"][key])
+    
+    data = []
+    if len(event.rows) > 0:
+        for row in event.rows:
+            deleted = {
+                "values": row["values"],
+            }
+            data.append(deleted)
+    else:
+        deleted = {
+            "values": event.rows[0]["values"],
+        }
+        data.append(deleted)
+    
+    json_message = {"type": "delete", "data": data, "timestamp": time.time()}
+
+    return json.dumps(json_message)
 
 
 def permissions_check(connection: mysql.connector.connection.MySQLConnection) -> bool:
@@ -133,15 +208,17 @@ def permissions_check(connection: mysql.connector.connection.MySQLConnection) ->
     Returns:
         permission (bool): true if the current user has the necessary permissions, False otherwise.
     """
-    permission = False
+    permission1 = False
+    permission2 = False
     with connection.cursor() as cursor:
         cursor.execute("SHOW GRANTS FOR CURRENT_USER()")
         results = cursor.fetchall()
         for row in results:
             if "REPLICATION SLAVE" in row[0]:
-                permission = True
-                break
-    return permission
+                permission1 = True
+            if "REPLICATION CLIENT" in row[0]:
+                permission2 = True
+    return permission1 and permission2
 
 
 def permission_grant() -> None:
@@ -160,10 +237,12 @@ def permission_grant() -> None:
         user = os.getenv("MYSQL_USER")
         cursor.execute(f"GRANT REPLICATION SLAVE ON *.* TO '{user}'@'%';")
         temporal_connection.commit()
+        cursor.execute(f"GRANT REPLICATION CLIENT ON *.* TO '{user}'@'%';")
+        temporal_connection.commit()
         temporal_connection.close()
 
 
-def listen_for_changes() -> None:
+def listen_for_changes(producer: KafkaProducer) -> None:
     """
     Listens and processes events in the MySQL binary log.
     """
@@ -191,13 +270,15 @@ def listen_for_changes() -> None:
         for event in stream:
             if event.timestamp > start_timestamp and event.rows is not None:
                 if isinstance(event, WriteRowsEvent):
-                    insert_event(event)
+                    parsed_json = insert_event(event)
 
                 if isinstance(event, UpdateRowsEvent):
-                    update_event(event)
+                    parsed_json = update_event(event)
 
                 if isinstance(event, DeleteRowsEvent):
-                    delete_event(event)
+                    parsed_json = delete_event(event)
+
+                send_topic(parsed_json, producer)
     finally:
         if stream is not None:
             stream.close()
@@ -205,8 +286,8 @@ def listen_for_changes() -> None:
 
 def main() -> None:
     """
-    Attempts to establish a connection with a database and listen for changes. If the connection fails or 
-    permission to access the database is denied, the function will retry a limited number of times before 
+    Attempts to establish a connection with a database and listen for changes. If the connection fails or
+    permission to access the database is denied, the function will retry a limited number of times before
     ultimately failing and exiting.
     """
     contador_reintentos = 0
@@ -219,7 +300,8 @@ def main() -> None:
                 while not permissions_check(connection):
                     permission_grant()
                 connection.close()
-                listen_for_changes()
+                producer = create_producer()
+                listen_for_changes(producer)
                 break
             finally:
                 connection.close()

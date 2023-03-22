@@ -1,10 +1,10 @@
 FROM pypy:3.9-7.3.11-slim
 
-COPY db_watcher.py .
+COPY main.py .
 COPY requirements.txt .
 
 RUN pip install --upgrade pip
 
 RUN pip install -r requirements.txt
 
-CMD ["pypy3", "db_watcher.py"]
+CMD ["pypy3", "main.py"]

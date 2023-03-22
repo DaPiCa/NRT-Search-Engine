@@ -1,22 +1,13 @@
-from confluent_kafka import Consumer
+from kafka import KafkaConsumer
 
-c = Consumer({
-    'bootstrap.servers': 'localhost:29092',
-    'group.id': 'mygroup',
-    'auto.offset.reset': 'earliest'
-})
+config = {
+    'bootstrap_servers': 'localhost:29092',
+    'client_id': 'consumer-python',}
 
-c.subscribe(['topic1'])
+consumer = KafkaConsumer(**config)
 
-while True:
-    msg = c.poll(1.0)
+consumer.subscribe(topics=['modification'])
 
-    if msg is None:
-        continue
-    if msg.error():
-        print("Consumer error: {}".format(msg.error()))
-        continue
-
-    print('Received message: {}\n\tLongitud: {}'.format(msg.value().decode('utf-8'), len(msg.value().decode('utf-8'))))
-
-c.close()
+for msg in consumer:
+    print(msg)
+    print(f"\t\t{msg.value.decode('utf-8')}")

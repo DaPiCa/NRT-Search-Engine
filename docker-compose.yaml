@@ -1,4 +1,4 @@
-version: '0.1.0'
+version: '0.2.0'
 services:
   persistence:
     image: persistence:latest
@@ -9,40 +9,70 @@ services:
     env_file:
       - .env
     healthcheck:
-            test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
-            timeout: 20s
-            retries: 10
-  
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+
   zookeeper:
-      image: confluentinc/cp-zookeeper:latest
-      environment:
-        ZOOKEEPER_CLIENT_PORT: 2181
-        ZOOKEEPER_TICK_TIME: 2000
-      ports:
-        - 22181:2181
+    image: confluentinc/cp-zookeeper:latest
+    env_file:
+      - .env
+    ports:
+      - ${ZOOKEEPER_CLIENT_PORT}:${ZOOKEEPER_CLIENT_PORT}
+
   kafka:
-      image: confluentinc/cp-kafka:latest
-      depends_on:
-        - zookeeper
-      ports:
-        - 29092:29092
-      environment:
-        KAFKA_BROKER_ID: 1
-        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-        KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-        KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      command: sh -c "((sleep 15 && kafka-topics --create --zookeeper zookeeper:2181 --replication-factor 1 --partitions 3 --topic topic1)&) && /etc/confluent/docker/run ">
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - ${KAFKA_BROKER_PORT}:${KAFKA_BROKER_PORT}
+    env_file:
+      - .env
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:${ZOOKEEPER_CLIENT_PORT}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://${KAFKA_BROKER}:${KAFKA_BROKER_PORT}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  init_kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server kafka:${KAFKA_BROKER_PORT} --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka:${KAFKA_BROKER_PORT} --create --if-not-exists --topic ${TOPIC_INSERT} --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:${KAFKA_BROKER_PORT} --create --if-not-exists --topic ${TOPIC_UPDATE} --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:${KAFKA_BROKER_PORT} --create --if-not-exists --topic ${TOPIC_DELETE} --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:${KAFKA_BROKER_PORT} --list
+      "
 
   producer:
     image: producer:latest
     hostname: producer
     build: ./producer
     depends_on:
+      init_kafka:
+        condition: service_completed_successfully
       persistence:
-        condition: service_healthy
-    ports:
-      - 8080:8080
+          condition: service_healthy
+    env_file:
+      - .env
+
+  consumer:
+    image: consumer:latest
+    hostname: consumer
+    build: ./consumer
+    depends_on:
+      - kafka
+      - init_kafka
     env_file:
       - .env

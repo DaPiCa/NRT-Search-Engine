@@ -1,21 +1,10 @@
-from confluent_kafka import Producer
+from kafka import KafkaProducer
+from kafka.producer.future import FutureRecordMetadata
 
-longitud = 1
+producer = KafkaProducer(bootstrap_servers='localhost:29092', client_id='producer-python')
 
-p = Producer({'bootstrap.servers': 'localhost:29092'})
-def delivery_report(err, msg):
-    """ Called once for each message produced to indicate delivery result.
-        Triggered by poll() or flush(). """
-    if err is not None:
-        print('Message delivery failed: {}'.format(err))
-    else:
-        print('Message delivered to {} [{}]\n\tLongitud({})'.format(msg.topic(), msg.partition(), longitud))
-
-while True:
-    cadena = 'a' * longitud
-    p.produce('topic1', cadena.encode('utf-8'), callback=delivery_report)
-    longitud += 1
-
-# Wait for any outstanding messages to be delivered and delivery report
-# callbacks to be triggered.
-p.flush()
+future: FutureRecordMetadata = producer.send('modification', b'another_message')
+future.get(timeout=60)
+# Check if the message was sent
+if future.is_done:
+    print("Message sent")
