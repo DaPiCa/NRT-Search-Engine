@@ -105,7 +105,7 @@ def check_environment_variables() -> None:
     used_variables = ["KAFKA_BROKER", "KAFKA_BROKER_PORT", "TOPIC_INSERT", "TOPIC_UPDATE", "TOPIC_DELETE"]
     for variable in used_variables:
         if variable not in os.environ:
-            raise Exception(f"Environment variable {variable} not found")
+            raise KeyError(f"Environment variable {variable} not found")
 
 
 def create_consumer() -> KafkaConsumer:
@@ -136,7 +136,7 @@ def main() -> None:
     """
     try:
         check_environment_variables()
-    except Exception as err:
+    except KeyError as err:
         lg.error(f"Error: {err}")
         sys.exit(1)
     consumer = create_consumer()

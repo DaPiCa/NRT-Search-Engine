@@ -102,9 +102,9 @@ def insert_event(event: WriteRowsEvent) -> str:
     """
     lg.info("Received Insert Event")
     for row in event.rows:
-        lg.info("\tInserted row:")
+        lg.debug("\tInserted row:")
         for key in row["values"]:
-            lg.info("\t\t%s : %s", key, row["values"][key])
+            lg.debug("\t\t%s : %s", key, row["values"][key])
     
     data = []
     if len(event.rows) > 0:
@@ -136,9 +136,9 @@ def update_event(event: UpdateRowsEvent) -> str:
     """
     lg.info("Received Update Event")
     for row in event.rows:
-        lg.info("\tUpdated row:")
+        lg.debug("\tUpdated row:")
         for key in row["after_values"]:
-            lg.info(
+            lg.debug(
                 "\t\tValue %s: %s => %s",
                 key,
                 row["before_values"][key],
@@ -176,9 +176,9 @@ def delete_event(event: DeleteRowsEvent) -> str:
     """
     lg.info("Received Delete Event")
     for row in event.rows:
-        lg.info("\tDeleted row:")
+        lg.debug("\tDeleted row:")
         for key in row["values"]:
-            lg.info("\t\t%s : %s", key, row["values"][key])
+            lg.debug("\t\t%s : %s", key, row["values"][key])
     
     data = []
     if len(event.rows) > 0:
