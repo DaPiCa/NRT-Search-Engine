@@ -72,7 +72,9 @@ services:
     hostname: consumer
     build: ./consumer
     depends_on:
-      - kafka
-      - init_kafka
+      init_kafka:
+        condition: service_completed_successfully
+      persistence:
+          condition: service_healthy
     env_file:
       - .env

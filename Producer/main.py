@@ -50,7 +50,8 @@ def send_topic(data: str, producer: KafkaProducer) -> None:
         "update": os.getenv("TOPIC_UPDATE"),
         "delete": os.getenv("TOPIC_DELETE"),
     }
-    future: FutureRecordMetadata = producer.send(topics[json.loads(data)["type"]], data.encode("utf-8"), timestamp_ms=calendar.timegm(time.gmtime()))
+    future: FutureRecordMetadata = producer.send(topics[json.loads(
+        data)["type"]], data.encode("utf-8"), timestamp_ms=calendar.timegm(time.gmtime()))
     future.get(timeout=60)
     if future.is_done:
         lg.info("Message sent")
@@ -75,7 +76,8 @@ def connection_manager(
         connection = mysql.connector.connect(
             host=os.getenv("MYSQL_HOST"),
             port=os.getenv("MYSQL_PORT"),
-            user=os.getenv("MYSQL_USER") if not root else os.getenv("MYSQL_ROOT_USER"),
+            user=os.getenv("MYSQL_USER") if not root else os.getenv(
+                "MYSQL_ROOT_USER"),
             password=os.getenv("MYSQL_PASSWORD")
             if not root
             else os.getenv("MYSQL_ROOT_PASSWORD"),
@@ -105,7 +107,7 @@ def insert_event(event: WriteRowsEvent) -> str:
         lg.debug("\tInserted row:")
         for key in row["values"]:
             lg.debug("\t\t%s : %s", key, row["values"][key])
-    
+
     data = []
     if len(event.rows) > 0:
         for row in event.rows:
@@ -118,9 +120,9 @@ def insert_event(event: WriteRowsEvent) -> str:
             "values": event.rows[0]["values"],
         }
         data.append(insert)
-    
+
     json_message = {"type": "insert", "data": data, "timestamp": time.time()}
-    
+
     return json.dumps(json_message)
 
 
@@ -145,7 +147,7 @@ def update_event(event: UpdateRowsEvent) -> str:
                 row["after_values"][key],
             )
     data = []
-    if(len(event.rows) > 0):
+    if len(event.rows) > 0:
         for row in event.rows:
             update = {
                 "before": row["before_values"],
@@ -158,7 +160,7 @@ def update_event(event: UpdateRowsEvent) -> str:
             "after": event.rows[0]["after_values"]
         }
         data.append(update)
-    
+
     json_message = {"type": "update", "data": data, "timestamp": time.time()}
 
     return json.dumps(json_message)
@@ -179,7 +181,7 @@ def delete_event(event: DeleteRowsEvent) -> str:
         lg.debug("\tDeleted row:")
         for key in row["values"]:
             lg.debug("\t\t%s : %s", key, row["values"][key])
-    
+
     data = []
     if len(event.rows) > 0:
         for row in event.rows:
@@ -192,7 +194,7 @@ def delete_event(event: DeleteRowsEvent) -> str:
             "values": event.rows[0]["values"],
         }
         data.append(deleted)
-    
+
     json_message = {"type": "delete", "data": data, "timestamp": time.time()}
 
     return json.dumps(json_message)
@@ -296,7 +298,8 @@ def main() -> None:
         connection = connection_manager()
         if connection is not None and connection.is_connected():
             try:
-                lg.info("Connection established with database %s", connection.database)
+                lg.info("Connection established with database %s",
+                        connection.database)
                 while not permissions_check(connection):
                     permission_grant()
                 connection.close()

@@ -9,18 +9,22 @@ import calendar
 import time
 from kafka import KafkaConsumer
 from kafka.consumer.fetcher import ConsumerRecord
+from kafka.errors import UnrecognizedBrokerVersion, NoBrokersAvailable
+
 
 def insert(msg: ConsumerRecord) -> None:
     """Función que recibe un objeto ConsumerRecord y registra un mensaje de inserción.
 
     Args:
         msg (ConsumerRecord): Objeto ConsumerRecord que contiene el mensaje recibido.
-        
+
     Returns:
         None.
     """
-    lg.info(f"Insert: {msg.value.decode('utf-8')}")
-    lg.debug(f"Time between insert and consume: {msg.timestamp - calendar.timegm(time.gmtime())} seconds")
+    lg.info("Insert: %s", msg.value.decode('utf-8'))
+    lg.debug(
+        "Time between insert and consume: %d seconds", calendar.timegm(time.gmtime())-msg.timestamp)
+
 
 def modification(msg: ConsumerRecord) -> None:
     """Función que recibe un objeto ConsumerRecord y registra un mensaje de modificación.
@@ -31,10 +35,12 @@ def modification(msg: ConsumerRecord) -> None:
     Returns:
         None.
     """
-    lg.info(f"Modification: {msg.value.decode('utf-8')}")
-    lg.debug(f"\tData Timestamp: {msg.timestamp}")
-    lg.debug(f"\tCurrent Timestamp: {calendar.timegm(time.gmtime())}")
-    lg.debug(f"Time between modification and consume: {msg.timestamp - calendar.timegm(time.gmtime())} seconds")
+    lg.info("Modification: %s", msg.value.decode('utf-8'))
+    lg.debug("\tData Timestamp: %s", msg.timestamp)
+    lg.debug("\tCurrent Timestamp: {calendar.timegm(time.gmtime())}")
+    lg.debug(
+        "Time between modification and consume: %d seconds", calendar.timegm(time.gmtime())-msg.timestamp)
+
 
 def delete(msg: ConsumerRecord) -> None:
     """Función que recibe un objeto ConsumerRecord y registra un mensaje de eliminación.
@@ -45,8 +51,10 @@ def delete(msg: ConsumerRecord) -> None:
     Returns:
         None.
     """
-    lg.info(f"Delete: {msg.value.decode('utf-8')}")
-    lg.debug(f"Time between delete and consume: {msg.timestamp - calendar.timegm(time.gmtime())} seconds")
+    lg.info("Delete: %s", msg.value.decode('utf-8'))
+    lg.debug(
+        "Time between delete and consume: %d seconds", calendar.timegm(time.gmtime())-msg.timestamp)
+
 
 def received_from_topic(msg: ConsumerRecord) -> None:
     """Función que recibe un objeto ConsumerRecord y ejecuta una función en función del tema recibido.
@@ -61,11 +69,13 @@ def received_from_topic(msg: ConsumerRecord) -> None:
     actual_topics = {
         os.getenv("TOPIC_INSERT"): modification,
         os.getenv("TOPIC_UPDATE"): modification,
-        os.getenv("TOPIC_DELETE"): delete,}
+        os.getenv("TOPIC_DELETE"): delete, }
     try:
         actual_topics[msg.topic](msg)
     except KeyError:
-        lg.error(f"Received message from topic {msg.topic} but no function is defined for it")
+        lg.error(
+            "Received message from topic %s but no function is defined for it", msg.topic)
+
 
 def consume(consumer: KafkaConsumer) -> None:
     """Función que consume mensajes de un servidor de Kafka.
@@ -79,16 +89,18 @@ def consume(consumer: KafkaConsumer) -> None:
     start_timestamp = calendar.timegm(time.gmtime())
     while True:
         try:
-            consumer.subscribe(list(set([os.getenv("TOPIC_INSERT"), os.getenv("TOPIC_UPDATE"), os.getenv("TOPIC_DELETE")])))
-        except Exception as err:
-            lg.error(f"Error: {err}")
+            consumer.subscribe(list(set([os.getenv("TOPIC_INSERT"), os.getenv(
+                "TOPIC_UPDATE"), os.getenv("TOPIC_DELETE")])))
+        except AssertionError as err:
+            lg.error("Error: %s", err)
             sys.exit(1)
-        
+
         for msg in consumer:
-            if(start_timestamp < msg.timestamp):
+            if start_timestamp < msg.timestamp:
                 received_from_topic(msg)
                 # Set the offset to the next message
                 consumer.commit()
+
 
 def check_environment_variables() -> None:
     """Función que comprueba si las variables de entorno necesarias están definidas.
@@ -102,7 +114,8 @@ def check_environment_variables() -> None:
     Raises:
         Exception: Si una de las variables de entorno necesarias no está definida.
     """
-    used_variables = ["KAFKA_BROKER", "KAFKA_BROKER_PORT", "TOPIC_INSERT", "TOPIC_UPDATE", "TOPIC_DELETE"]
+    used_variables = ["KAFKA_BROKER", "KAFKA_BROKER_PORT",
+                      "TOPIC_INSERT", "TOPIC_UPDATE", "TOPIC_DELETE"]
     for variable in used_variables:
         if variable not in os.environ:
             raise KeyError(f"Environment variable {variable} not found")
@@ -123,7 +136,19 @@ def create_consumer() -> KafkaConsumer:
         "auto_offset_reset": "earliest",
         "group_id": "consumer-python-group",
     }
-    return KafkaConsumer(**configuration)
+    # Retry until the broker is available
+    while True:
+        try:
+            return KafkaConsumer(**configuration)
+        except UnrecognizedBrokerVersion as err:
+            lg.error("Broker not found.\n\tError: %s", err)
+            lg.error("Retrying in 5 seconds...")
+            time.sleep(5)
+        except NoBrokersAvailable as err:
+            lg.error("Broker not found.\n\tError: %s", err)
+            lg.error("Retrying in 5 seconds...")
+            time.sleep(5)
+
 
 def main() -> None:
     """Función principal del programa que crea un consumidor de Kafka y consume mensajes de los topics especificados.
@@ -137,10 +162,11 @@ def main() -> None:
     try:
         check_environment_variables()
     except KeyError as err:
-        lg.error(f"Error: {err}")
+        lg.error("Error: %s", err)
         sys.exit(1)
     consumer = create_consumer()
     consume(consumer)
+
 
 if __name__ == "__main__":
     lg_conf.dictConfig(
