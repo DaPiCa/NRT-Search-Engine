@@ -13,10 +13,10 @@ from kafka.errors import UnrecognizedBrokerVersion, NoBrokersAvailable
 
 
 def insert(msg: ConsumerRecord) -> None:
-    """Función que recibe un objeto ConsumerRecord y registra un mensaje de inserción.
+    """Function that receives a ConsumerRecord object and logs an insert message.
 
     Args:
-        msg (ConsumerRecord): Objeto ConsumerRecord que contiene el mensaje recibido.
+        msg (ConsumerRecord): ConsumerRecord object containing the received message.
 
     Returns:
         None.
@@ -27,10 +27,10 @@ def insert(msg: ConsumerRecord) -> None:
 
 
 def modification(msg: ConsumerRecord) -> None:
-    """Función que recibe un objeto ConsumerRecord y registra un mensaje de modificación.
+    """Function that receives a ConsumerRecord object and logs a modification message.
 
     Args:
-        msg (ConsumerRecord): Objeto ConsumerRecord que contiene el mensaje recibido.
+        msg (ConsumerRecord): ConsumerRecord object containing the received message.
 
     Returns:
         None.
@@ -43,10 +43,10 @@ def modification(msg: ConsumerRecord) -> None:
 
 
 def delete(msg: ConsumerRecord) -> None:
-    """Función que recibe un objeto ConsumerRecord y registra un mensaje de eliminación.
+    """Function that receives a ConsumerRecord object and logs a deletion message.
 
     Args:
-        msg (ConsumerRecord): Objeto ConsumerRecord que contiene el mensaje recibido.
+        msg (ConsumerRecord): ConsumerRecord object containing the message received.
 
     Returns:
         None.
@@ -57,10 +57,10 @@ def delete(msg: ConsumerRecord) -> None:
 
 
 def received_from_topic(msg: ConsumerRecord) -> None:
-    """Función que recibe un objeto ConsumerRecord y ejecuta una función en función del tema recibido.
+    """Function that receives a ConsumerRecord object and executes a function based on the received subject.
 
     Args:
-        msg (ConsumerRecord): Objeto ConsumerRecord que contiene el mensaje recibido.
+        msg (ConsumerRecord): ConsumerRecord object containing the received message.
 
     Returns:
         None.
@@ -78,10 +78,10 @@ def received_from_topic(msg: ConsumerRecord) -> None:
 
 
 def consume(consumer: KafkaConsumer) -> None:
-    """Función que consume mensajes de un servidor de Kafka.
+    """Function that consumes messages from a Kafka server.
 
     Args:
-        consumer (KafkaConsumer): Objeto KafkaConsumer que consume mensajes de Kafka.
+        consumer (KafkaConsumer): object KafkaConsumer that consumes messages from Kafka.
 
     Returns:
         None.
@@ -103,7 +103,7 @@ def consume(consumer: KafkaConsumer) -> None:
 
 
 def check_environment_variables() -> None:
-    """Función que comprueba si las variables de entorno necesarias están definidas.
+    """Function that checks if the required environment variables are defined.
 
     Args:
         None.
@@ -112,7 +112,7 @@ def check_environment_variables() -> None:
         None.
 
     Raises:
-        Exception: Si una de las variables de entorno necesarias no está definida.
+        KeyError: If one of the required environment variables is not defined.
     """
     used_variables = ["KAFKA_BROKER", "KAFKA_BROKER_PORT",
                       "TOPIC_INSERT", "TOPIC_UPDATE", "TOPIC_DELETE"]
@@ -122,13 +122,13 @@ def check_environment_variables() -> None:
 
 
 def create_consumer() -> KafkaConsumer:
-    """Función que crea y devuelve un objeto KafkaConsumer para consumir mensajes de Kafka.
+    """Function that creates and returns a KafkaConsumer object to consume Kafka messages.
 
     Args:
         None.
 
     Returns:
-        KafkaConsumer: Objeto KafkaConsumer que consume mensajes de Kafka.
+        KafkaConsumer: KafkaConsumer object that consumes Kafka messages.
     """
     configuration = {
         "bootstrap_servers": f"{os.getenv('KAFKA_BROKER')}:{os.getenv('KAFKA_BROKER_PORT')}",
@@ -151,7 +151,7 @@ def create_consumer() -> KafkaConsumer:
 
 
 def main() -> None:
-    """Función principal del programa que crea un consumidor de Kafka y consume mensajes de los topics especificados.
+    """Main program function that creates a Kafka consumer and consumes messages from the specified topics.
 
     Args:
         None.
