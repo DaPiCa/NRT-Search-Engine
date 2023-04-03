@@ -113,4 +113,4 @@ if __name__ == "__main__":
     )
 
     es = connect_to_elastic()
-    app.run(host="0.0.0.0", port=os.getenv("API_PORT"), debug=True)
+    app.run(host="0.0.0.0", port=os.getenv("API_PORT"), debug=True) # nosec

@@ -75,7 +75,7 @@ def insert(conn, elastic):
         for table in tables:
             lg.info("\tInserting/Indexing documents from %s", table[0])
             table_name = table[0]
-            cursor.execute(f"SELECT * FROM {table_name}")
+            cursor.execute("SELECT * FROM %s", (table_name,))
             rows = cursor.fetchall()
             for row in rows:
                 row_dict = {}
