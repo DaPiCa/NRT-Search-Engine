@@ -10,6 +10,8 @@ import time
 from kafka import KafkaConsumer
 from kafka.consumer.fetcher import ConsumerRecord
 from kafka.errors import UnrecognizedBrokerVersion, NoBrokersAvailable
+import requests
+import asyncio
 
 
 def insert(msg: ConsumerRecord) -> None:
@@ -21,9 +23,16 @@ def insert(msg: ConsumerRecord) -> None:
     Returns:
         None.
     """
-    lg.info("Insert: %s", msg.value.decode('utf-8'))
+    lg.info("Insert: %s", msg.value.decode("utf-8"))
     lg.debug(
-        "Time between insert and consume: %d seconds", calendar.timegm(time.gmtime())-msg.timestamp)
+        "Time between insert and consume: %d seconds",
+        calendar.timegm(time.gmtime()) - msg.timestamp,
+    )
+    post = requests.post(
+        f"http://api:{os.getenv('API_PORT')}/insert",
+        json=json.loads(msg.value.decode("utf-8")),
+    )
+    lg.debug("Response from API: %s", post.text)
 
 
 def modification(msg: ConsumerRecord) -> None:
@@ -35,11 +44,21 @@ def modification(msg: ConsumerRecord) -> None:
     Returns:
         None.
     """
-    lg.info("Modification: %s", msg.value.decode('utf-8'))
-    lg.debug("\tData Timestamp: %s", msg.timestamp)
-    lg.debug("\tCurrent Timestamp: {calendar.timegm(time.gmtime())}")
-    lg.debug(
-        "Time between modification and consume: %d seconds", calendar.timegm(time.gmtime())-msg.timestamp)
+    if json.loads(msg.value.decode("utf-8"))["type"] == "insert":
+        insert(msg)
+    else:
+        lg.info("Modification: %s", msg.value.decode("utf-8"))
+        lg.debug("\tData Timestamp: %s", msg.timestamp)
+        lg.debug("\tCurrent Timestamp: {calendar.timegm(time.gmtime())}")
+        lg.debug(
+            "Time between modification and consume: %d seconds",
+            calendar.timegm(time.gmtime()) - msg.timestamp,
+        )
+        post = requests.post(
+            f"http://API:{os.getenv('API_PORT')}/modify",
+            json=json.loads(msg.value.decode("utf-8")),
+        )
+        lg.debug("Response from API: %s", post.text)
 
 
 def delete(msg: ConsumerRecord) -> None:
@@ -51,9 +70,16 @@ def delete(msg: ConsumerRecord) -> None:
     Returns:
         None.
     """
-    lg.info("Delete: %s", msg.value.decode('utf-8'))
+    lg.info("Delete: %s", msg.value.decode("utf-8"))
     lg.debug(
-        "Time between delete and consume: %d seconds", calendar.timegm(time.gmtime())-msg.timestamp)
+        "Time between delete and consume: %d seconds",
+        calendar.timegm(time.gmtime()) - msg.timestamp,
+    )
+    post = requests.post(
+        f"http://api:{os.getenv('API_PORT')}/delete",
+        json=json.loads(msg.value.decode("utf-8")),
+    )
+    lg.debug("Response from API: %s", post.text)
 
 
 def received_from_topic(msg: ConsumerRecord) -> None:
@@ -67,17 +93,20 @@ def received_from_topic(msg: ConsumerRecord) -> None:
     """
     # Create a dictionary with the topic and a function to be executed
     actual_topics = {
-        os.getenv("TOPIC_INSERT"): modification,
-        os.getenv("TOPIC_UPDATE"): modification,
-        os.getenv("TOPIC_DELETE"): delete, }
+        "insert": insert,
+        "update": modification,
+        "delete": delete,
+    }
     try:
-        actual_topics[msg.topic](msg)
+        actual_topics[json.loads(msg.value.decode("utf-8"))["type"]](msg)
     except KeyError:
         lg.error(
-            "Received message from topic %s but no function is defined for it", msg.topic)
+            "Received message from topic %s but no function is defined for it",
+            msg.topic,
+        )
 
 
-def consume(consumer: KafkaConsumer) -> None:
+async def consume(consumer: KafkaConsumer, topic: str) -> None:
     """Function that consumes messages from a Kafka server.
 
     Args:
@@ -89,8 +118,7 @@ def consume(consumer: KafkaConsumer) -> None:
     start_timestamp = calendar.timegm(time.gmtime())
     while True:
         try:
-            consumer.subscribe(list(set([os.getenv("TOPIC_INSERT"), os.getenv(
-                "TOPIC_UPDATE"), os.getenv("TOPIC_DELETE")])))
+            consumer.subscribe([topic])
         except AssertionError as err:
             lg.error("Error: %s", err)
             sys.exit(1)
@@ -114,8 +142,13 @@ def check_environment_variables() -> None:
     Raises:
         KeyError: If one of the required environment variables is not defined.
     """
-    used_variables = ["KAFKA_BROKER", "KAFKA_BROKER_PORT",
-                      "TOPIC_INSERT", "TOPIC_UPDATE", "TOPIC_DELETE"]
+    used_variables = [
+        "KAFKA_BROKER",
+        "KAFKA_BROKER_PORT",
+        "TOPIC_INSERT",
+        "TOPIC_UPDATE",
+        "TOPIC_DELETE",
+    ]
     for variable in used_variables:
         if variable not in os.environ:
             raise KeyError(f"Environment variable {variable} not found")
@@ -150,6 +183,33 @@ def create_consumer() -> KafkaConsumer:
             time.sleep(5)
 
 
+def start_consumer_service() -> None:
+    """Function that starts the consumer service.
+
+    Args:
+        None.
+
+    Returns:
+        None.
+    """
+    topics = list(
+        set(
+            [
+                os.getenv("TOPIC_INSERT"),
+                os.getenv("TOPIC_UPDATE"),
+                os.getenv("TOPIC_DELETE"),
+            ]
+        )
+    )
+    if len(topics) == 0:
+        lg.error("No topics defined")
+        sys.exit(1)
+    else:
+        for topic in topics:
+            # Create a consumer for each topic and start consuming messages asynchronously
+            asyncio.run(consume(create_consumer(), topic))
+
+
 def main() -> None:
     """Main program function that creates a Kafka consumer and consumes messages from the specified topics.
 
@@ -164,8 +224,7 @@ def main() -> None:
     except KeyError as err:
         lg.error("Error: %s", err)
         sys.exit(1)
-    consumer = create_consumer()
-    consume(consumer)
+    start_consumer_service()
 
 
 if __name__ == "__main__":

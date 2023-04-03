@@ -121,7 +121,7 @@ def insert_event(event: WriteRowsEvent) -> str:
         }
         data.append(insert)
 
-    json_message = {"type": "insert", "data": data, "timestamp": time.time()}
+    json_message = {"type": "insert", "data": data, "timestamp": time.time(), "table": event.table}
 
     return json.dumps(json_message)
 
@@ -161,7 +161,7 @@ def update_event(event: UpdateRowsEvent) -> str:
         }
         data.append(update)
 
-    json_message = {"type": "update", "data": data, "timestamp": time.time()}
+    json_message = {"type": "update", "data": data, "timestamp": time.time(), "table": event.table}
 
     return json.dumps(json_message)
 
@@ -195,7 +195,7 @@ def delete_event(event: DeleteRowsEvent) -> str:
         }
         data.append(deleted)
 
-    json_message = {"type": "delete", "data": data, "timestamp": time.time()}
+    json_message = {"type": "delete", "data": data, "timestamp": time.time(), "table": event.table}
 
     return json.dumps(json_message)
 
