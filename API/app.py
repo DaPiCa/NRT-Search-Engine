@@ -38,14 +38,28 @@ def get_id_from_elastic(old_entry, table):
                 "must": [
                     {"match": {key: value}}
                     for key, value in old_entry.items()
-                    if value != "None"
+                    if value is not None and value != ""
                 ]
             }
         }
     }
-    print(query)
-    resp = es.search(index=table, body=query)
-    return resp["hits"]["hits"][0]["_id"]
+
+    lg.debug(f"Query to ElasticSearch: {query}")
+    try:
+        resp = es.search(index=table, body=query)
+        lg.debug(f"Response from ElasticSearch: {resp}")
+        if len(resp["hits"]["hits"]) == 0:
+            lg.error("No entry found")
+            return None, "No entry found"
+        elif len(resp["hits"]["hits"]) > 1:
+            lg.error("More than one entry found")
+            return None, "More than one entry found"
+        else:
+            return resp["hits"]["hits"][0]["_id"]
+    except Exception as e:
+        lg.error(f"Error while getting id: {e}")
+        return None, "Error while getting id from ElasticSearch"
+
 
 @app.route("/modify", methods=["POST"])
 def modify():
@@ -57,9 +71,15 @@ def modify():
         table = data["table"]
         # Get the id of the entry in ElasticSearch
         id = get_id_from_elastic(old_entry, table)
+        if isinstance(id, tuple):
+            lg.error(f"Error while getting id: {id}")
+            return jsonify(
+                {"status": f"Error while getting id from {old_entry}: {id[1]}"}
+            )
         # Modify the entry in ElasticSearch
         resp = es.update(index=table, id=id, body={"doc": new_entry})
         lg.debug(f"Response from ElasticSearch: {resp}")
+    return jsonify({"status": "success"})
 
 
 def connect_to_elastic():

@@ -29,8 +29,9 @@ def insert(msg: ConsumerRecord) -> None:
         calendar.timegm(time.gmtime()) - msg.timestamp,
     )
     post = requests.post(
-        f"http://api:{os.getenv('API_PORT')}/insert",
+        f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/insert",
         json=json.loads(msg.value.decode("utf-8")),
+        timeout=5,
     )
     lg.debug("Response from API: %s", post.text)
 
@@ -55,8 +56,9 @@ def modification(msg: ConsumerRecord) -> None:
             calendar.timegm(time.gmtime()) - msg.timestamp,
         )
         post = requests.post(
-            f"http://API:{os.getenv('API_PORT')}/modify",
+            f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/modify",
             json=json.loads(msg.value.decode("utf-8")),
+            timeout=5,
         )
         lg.debug("Response from API: %s", post.text)
 
@@ -76,8 +78,9 @@ def delete(msg: ConsumerRecord) -> None:
         calendar.timegm(time.gmtime()) - msg.timestamp,
     )
     post = requests.post(
-        f"http://api:{os.getenv('API_PORT')}/delete",
+        f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/delete",
         json=json.loads(msg.value.decode("utf-8")),
+        timeout=5,
     )
     lg.debug("Response from API: %s", post.text)
 

@@ -7,6 +7,7 @@ import sys
 import time
 import json
 
+
 def connect_to_database():
     connection = None
     while True:
@@ -28,12 +29,14 @@ def connect_to_database():
             sys.exit(1)
     return connection
 
+
 def connect_to_elastic():
-    ELASTIC_SEARCH_SERVER = f"http://{os.getenv('ELASTIC_HOST')}:{os.getenv('ELASTIC_PORT')}"
-    es = elasticsearch.Elasticsearch(ELASTIC_SEARCH_SERVER,
-                       use_ssl = False,
-                       ca_certs=False,
-                       verify_certs=False)
+    ELASTIC_SEARCH_SERVER = (
+        f"http://{os.getenv('ELASTIC_HOST')}:{os.getenv('ELASTIC_PORT')}"
+    )
+    es = elasticsearch.Elasticsearch(
+        ELASTIC_SEARCH_SERVER, use_ssl=False, ca_certs=False, verify_certs=False
+    )
     while True:
         try:
             es.info()
@@ -43,7 +46,7 @@ def connect_to_elastic():
             lg.error("Connection error: %s", e)
             lg.error("Retrying in 5 seconds...")
             time.sleep(5)
-               
+
 
 def remove(conn, elastic):
     # Take all tables from the database and remove them from ElasticSearch
@@ -52,10 +55,16 @@ def remove(conn, elastic):
         tables = cursor.fetchall()
         lg.info("Removing database from ElasticSearch. Please wait...")
         for table in tables:
-            table_name = table[0]
-            elastic.indices.delete(index=table_name, ignore=[400, 404])
+            # First check if the index exists in ElasticSearch
+            if elastic.indices.exists(index=table[0]):
+                lg.info("\tRemoving indexed documents from %s", table[0])
+                table_name = table[0]
+                query = {"query": {"match_all": {}}}
+                elastic.delete_by_query(index=table_name, body=query)
+                elastic.indices.delete(index=table_name)
         lg.info("Database removed from ElasticSearch")
-    
+
+
 def insert(conn, elastic):
     # Take all tables from the database and insert them into ElasticSearch
     remove(conn, elastic)
@@ -64,6 +73,7 @@ def insert(conn, elastic):
         tables = cursor.fetchall()
         lg.info("Inserting database into ElasticSearch. Please wait...")
         for table in tables:
+            lg.info("\tInserting/Indexing documents from %s", table[0])
             table_name = table[0]
             cursor.execute(f"SELECT * FROM {table_name}")
             rows = cursor.fetchall()
@@ -72,14 +82,12 @@ def insert(conn, elastic):
                 for i in range(len(row)):
                     row_dict[cursor.column_names[i]] = row[i]
                 elastic.index(index=table, document=row_dict)
-        
-        
+
     cursor.close()
     conn.close()
     lg.info("Database inserted into ElasticSearch")
-            
-        
-        
+
+
 if __name__ == "__main__":
     lg_conf.dictConfig(
         {
@@ -93,5 +101,5 @@ if __name__ == "__main__":
     )
     conn = connect_to_database()
     elastic = connect_to_elastic()
-    
+
     insert(conn, elastic)
