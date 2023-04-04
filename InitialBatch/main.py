@@ -120,7 +120,7 @@ def insert(
     It inserts all tables from the MySQL database into Elasticsearch.
     The function first removes any existing data in Elasticsearch using the remove function.
     Then, it retrieves all table names from the database using the SHOW TABLES query and iterates
-    through each table to retrieve all rows. 
+    through each table to retrieve all rows.
     Each row is transformed into a dictionary, where the keys correspond to the column names
     and the values correspond to the row values.
     Finally, each row dictionary
@@ -138,20 +138,20 @@ def insert(
     # Take all tables from the database and insert them into ElasticSearch
     remove(connector, elastic)
     with connector.cursor() as cursor:
-        cursor.execute("SHOW TABLES")
+        sql = "SHOW %s" % "TABLES"
+        cursor.execute(sql)
         tables = cursor.fetchall()
         lg.info("Inserting database into ElasticSearch. Please wait...")
         for table in tables:
             lg.info("\tInserting/Indexing documents from %s", table[0])
             table_name = table[0]
-            sentence = "SELECT * FROM %s" % table_name
-            cursor.execute(sentence)
-            rows = cursor.fetchall()
-            for row in rows:
+            sql = "SELECT * FROM {}".format(table_name)
+            cursor.execute(sql)
+            while row := cursor.fetchone():
                 row_dict = {}
                 for i, value in enumerate(row):
                     row_dict[cursor.column_names[i]] = value
-                elastic_connection.index(index=table, document=row_dict)
+                elastic_connection.index(index=table_name, document=row_dict)
 
     cursor.close()
     conn.close()
