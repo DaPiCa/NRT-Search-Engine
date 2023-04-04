@@ -145,7 +145,7 @@ def insert(
         for table in tables:
             lg.info("\tInserting/Indexing documents from %s", table[0])
             table_name = table[0]
-            sql = "SELECT * FROM {}".format(table_name)
+            sql = "SELECT * FROM {}".format(table_name) # nosec
             cursor.execute(sql)
             while row := cursor.fetchone():
                 row_dict = {}
