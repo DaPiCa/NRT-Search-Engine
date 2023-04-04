@@ -19,7 +19,6 @@ from kafka.producer.future import FutureRecordMetadata
 
 RETRY_LIMIT = 5
 
-
 def create_producer() -> KafkaProducer:
     """
     Creates a Kafka producer.
