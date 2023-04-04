@@ -5,9 +5,24 @@ import time
 
 import elasticsearch  # pylint: disable=import-error
 from flask import Flask, Response, jsonify, request  # pylint: disable=import-error
+from flask_cors import CORS
 
 app = Flask(__name__)
-elastic_search = None # pylint: disable=invalid-name
+elastic_search = None  # pylint: disable=invalid-name
+
+
+@app.route("/getindexes", methods=["GET"])
+def get_indexes_for_front():
+    # List all indexes in ElasticSearch and return them to the front-end
+    if elastic_search is not None:
+        try:
+            indexes = elastic_search.indices.get_alias(index="*")
+            for index in indexes:
+                print(index)
+
+        except elasticsearch.exceptions.ConnectionError as error:
+            lg.error("Connection error: %s", error)
+            return jsonify({"status": "ElasticSearch is not connected"})
 
 
 @app.route("/insert", methods=["POST"])
@@ -126,6 +141,29 @@ def modify_data():
     return jsonify({"status": "success"})
 
 
+@app.route("/delete", methods=["POST"])
+def delete_data():
+    lg.debug("Delete request received: %s", request)
+    data = request.get_json()
+    data_dict = data["data"]
+    for delete in data_dict:
+        table = data["table"]
+        # Get the id of the entry in ElasticSearch
+        _id = get_id_from_elastic(delete, table)
+        if isinstance(_id, tuple):
+            lg.error("Error while getting id: %s", _id[1])
+            return jsonify(
+                {"status": f"Error while getting id from {delete}: {_id[1]}"}
+            )
+        # Modify the entry in ElasticSearch
+        if elastic_search is None:
+            lg.error("ElasticSearch is not connected")
+            return jsonify({"status": "ElasticSearch is not connected"})
+        resp = elastic_search.delete(index=table, id=_id)
+        lg.debug("Response from ElasticSearch: %s", resp)
+    return jsonify({"status": "success"})
+
+
 def connect_to_elastic() -> None:
     """
     Connects to an ElasticSearch instance using the environment variables for the host and port.
@@ -137,7 +175,7 @@ def connect_to_elastic() -> None:
         elasticsearch.exceptions.ConnectionError: If the connection to the
         ElasticSearch server cannot be established.
     """
-    global elastic_search # pylint: disable=global-statement, invalid-name
+    global elastic_search  # pylint: disable=global-statement, invalid-name
     elastic_search_server = (
         f"http://{os.getenv('ELASTIC_HOST')}:{os.getenv('ELASTIC_PORT')}"
     )
@@ -148,6 +186,7 @@ def connect_to_elastic() -> None:
         try:
             elastic_search.info()
             lg.info("Connected to ElasticSearch")
+            break
         except elasticsearch.exceptions.ConnectionError as error:
             lg.error("Connection error: %s", error)
             lg.error("Retrying in 5 seconds...")

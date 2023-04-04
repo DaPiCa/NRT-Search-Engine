@@ -1,17 +1,18 @@
 # pylint: disable=import-error, line-too-long
 
+import calendar
+import threading
+import json
 import logging as lg
 import logging.config as lg_conf
-import sys
-import json
 import os
-import calendar
+import sys
 import time
+
 from kafka import KafkaConsumer
 from kafka.consumer.fetcher import ConsumerRecord
-from kafka.errors import UnrecognizedBrokerVersion, NoBrokersAvailable
+from kafka.errors import NoBrokersAvailable, UnrecognizedBrokerVersion
 import requests
-import asyncio
 
 
 def insert(msg: ConsumerRecord) -> None:
@@ -28,12 +29,15 @@ def insert(msg: ConsumerRecord) -> None:
         "Time between insert and consume: %d seconds",
         calendar.timegm(time.gmtime()) - msg.timestamp,
     )
-    post = requests.post(
-        f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/insert",
-        json=json.loads(msg.value.decode("utf-8")),
-        timeout=5,
-    )
-    lg.debug("Response from API: %s", post.text)
+    try:
+        post = requests.post(
+            f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/insert",
+            json=json.loads(msg.value.decode("utf-8")),
+            timeout=5,
+        )
+        lg.debug("Response from API: %s", post.text)
+    except requests.exceptions.ConnectionError as error:
+        lg.error("Connection error: %s", error)
 
 
 def modification(msg: ConsumerRecord) -> None:
@@ -55,12 +59,15 @@ def modification(msg: ConsumerRecord) -> None:
             "Time between modification and consume: %d seconds",
             calendar.timegm(time.gmtime()) - msg.timestamp,
         )
-        post = requests.post(
-            f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/modify",
-            json=json.loads(msg.value.decode("utf-8")),
-            timeout=5,
-        )
-        lg.debug("Response from API: %s", post.text)
+        try:
+            post = requests.post(
+                f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/modify",
+                json=json.loads(msg.value.decode("utf-8")),
+                timeout=5,
+            )
+            lg.debug("Response from API: %s", post.text)
+        except requests.exceptions.ConnectionError as error:
+            lg.error("Connection error: %s", error)
 
 
 def delete(msg: ConsumerRecord) -> None:
@@ -77,12 +84,15 @@ def delete(msg: ConsumerRecord) -> None:
         "Time between delete and consume: %d seconds",
         calendar.timegm(time.gmtime()) - msg.timestamp,
     )
-    post = requests.post(
-        f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/delete",
-        json=json.loads(msg.value.decode("utf-8")),
-        timeout=5,
-    )
-    lg.debug("Response from API: %s", post.text)
+    try:
+        post = requests.post(
+            f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/delete",
+            json=json.loads(msg.value.decode("utf-8")),
+            timeout=5,
+        )
+        lg.debug("Response from API: %s", post.text)
+    except requests.exceptions.ConnectionError as error:
+        lg.error("Connection error: %s", error)
 
 
 def received_from_topic(msg: ConsumerRecord) -> None:
@@ -109,7 +119,7 @@ def received_from_topic(msg: ConsumerRecord) -> None:
         )
 
 
-async def consume(consumer: KafkaConsumer, topic: str) -> None:
+def consume(consumer: KafkaConsumer, topic: str) -> None:
     """Function that consumes messages from a Kafka server.
 
     Args:
@@ -119,6 +129,7 @@ async def consume(consumer: KafkaConsumer, topic: str) -> None:
         None.
     """
     start_timestamp = calendar.timegm(time.gmtime())
+    lg.debug("Starting consume from topic %s", topic)
     while True:
         try:
             consumer.subscribe([topic])
@@ -208,10 +219,22 @@ def start_consumer_service() -> None:
         lg.error("No topics defined")
         sys.exit(1)
     else:
-        for topic in topics:
-            # Create a consumer for each topic and start consuming messages asynchronously
-            asyncio.run(consume(create_consumer(), topic))
+        try:
+            threads = []
+            for topic in topics:
+                lg.debug("Starting consumer for topic %s", topic)
+                t = threading.Thread(target=consume, args=(create_consumer(), topic,))
+                threads.append(t)
+                t.start()
 
+            # Esperar a que todos los hilos terminen antes de salir
+            for t in threads:
+                t.join()
+        except Exception as err:
+            for t in threads:
+                # Forzar la terminación de los hilos
+                t._stop()
+            lg.error("Error: %s", err)
 
 def main() -> None:
     """Main program function that creates a Kafka consumer and consumes messages from the specified topics.

@@ -3,3 +3,4 @@
 */.venv/*
 
 Pruebas/*
+*/node_modules/*

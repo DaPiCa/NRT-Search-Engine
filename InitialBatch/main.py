@@ -144,7 +144,8 @@ def insert(
         for table in tables:
             lg.info("\tInserting/Indexing documents from %s", table[0])
             table_name = table[0]
-            cursor.execute("SELECT * FROM %s", (table_name,))
+            sentence = "SELECT * FROM %s" % table_name
+            cursor.execute(sentence)
             rows = cursor.fetchall()
             for row in rows:
                 row_dict = {}
