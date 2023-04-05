@@ -8,6 +8,8 @@ from flask import Flask, Response, jsonify, request  # pylint: disable=import-er
 from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
+
 elastic_search = None  # pylint: disable=invalid-name
 
 
@@ -16,13 +18,49 @@ def get_indexes_for_front():
     # List all indexes in ElasticSearch and return them to the front-end
     if elastic_search is not None:
         try:
-            indexes = elastic_search.indices.get_alias(index="*")
-            for index in indexes:
-                print(index)
+            # Return all indexes that do not start with a dot and order them alphabetically
+            return jsonify(
+                {
+                    "indexes": sorted(
+                        [
+                            index
+                            for index in elastic_search.indices.get_alias().keys()
+                            if not index.startswith(".")
+                        ]
+                    )
+                }
+            )
 
         except elasticsearch.exceptions.ConnectionError as error:
             lg.error("Connection error: %s", error)
             return jsonify({"status": "ElasticSearch is not connected"})
+
+
+@app.route("/getfields", methods=["POST"])
+def get_fields_from_index():
+    data = request.get_json()
+    _index = data["index"]
+    if elastic_search is not None:
+        try:
+            # Return all fields in the index
+            return jsonify(
+                {
+                    "fields": sorted(
+                        [
+                            field
+                            for field in elastic_search.indices.get_mapping(
+                                index=_index
+                            )[_index]["mappings"]["properties"].keys()
+                        ]
+                    )
+                }
+            )
+        except elasticsearch.exceptions.ConnectionError as error:
+            lg.error("Connection error: %s", error)
+            return jsonify({"status": "ElasticSearch is not connected"})
+        except elasticsearch.exceptions.NotFoundError as error:
+            lg.error("Index not found: %s", error)
+            return jsonify({"status": "Index not found"})
 
 
 @app.route("/insert", methods=["POST"])
