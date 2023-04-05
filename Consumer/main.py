@@ -223,17 +223,17 @@ def start_consumer_service() -> None:
             threads = []
             for topic in topics:
                 lg.debug("Starting consumer for topic %s", topic)
-                t = threading.Thread(target=consume, args=(create_consumer(), topic,))
-                threads.append(t)
-                t.start()
+                thread = threading.Thread(target=consume, args=(create_consumer(), topic,))
+                threads.append(thread)
+                thread.start()
 
             # Esperar a que todos los hilos terminen antes de salir
-            for t in threads:
-                t.join()
+            for thread in threads:
+                thread.join()
         except Exception as err:
-            for t in threads:
+            for thread in threads:
                 # Forzar la terminación de los hilos
-                t._stop()
+                thread._stop()
             lg.error("Error: %s", err)
 
 def main() -> None:

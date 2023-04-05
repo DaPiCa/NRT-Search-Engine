@@ -5,7 +5,7 @@ import time
 
 import elasticsearch  # pylint: disable=import-error
 from flask import Flask, Response, jsonify, request  # pylint: disable=import-error
-from flask_cors import CORS
+from flask_cors import CORS  # pylint: disable=import-error
 
 app = Flask(__name__)
 CORS(app)
@@ -15,7 +15,16 @@ elastic_search = None  # pylint: disable=invalid-name
 
 @app.route("/getindexes", methods=["GET"])
 def get_indexes_for_front():
-    # List all indexes in ElasticSearch and return them to the front-end
+    """
+    Endpoint that retrieves a list of all non-system ElasticSearch indexes and returns
+    them as a JSON response to the front-end.
+
+    Returns:
+        A JSON response containing a list of all non-system ElasticSearch indexes in
+        alphabetical order. If there is an
+        error connecting to ElasticSearch, a JSON response containing an error message 
+        is returned instead.
+    """
     if elastic_search is not None:
         try:
             # Return all indexes that do not start with a dot and order them alphabetically
@@ -34,10 +43,28 @@ def get_indexes_for_front():
         except elasticsearch.exceptions.ConnectionError as error:
             lg.error("Connection error: %s", error)
             return jsonify({"status": "ElasticSearch is not connected"})
+    return jsonify({"status": "ElasticSearch is not connected"})
 
 
 @app.route("/getfields", methods=["POST"])
 def get_fields_from_index():
+    """
+    Retrieves a list of all the field names in the specified ElasticSearch index
+    and returns them in alphabetical order as a JSON response.
+
+    Args:
+        None
+
+    Returns:
+        A JSON object with a single key "fields" whose value is a sorted list of
+        all the field names in the specified ElasticSearch index.
+
+        If the ElasticSearch connection is not available, returns a JSON object with
+        a single key "status" whose value is the string "ElasticSearch is not connected".
+
+        If the specified index is not found in ElasticSearch, returns a JSON object with
+        a single key "status" whose value is the string "Index not found".
+    """
     data = request.get_json()
     _index = data["index"]
     if elastic_search is not None:
@@ -46,12 +73,11 @@ def get_fields_from_index():
             return jsonify(
                 {
                     "fields": sorted(
-                        [
-                            field
-                            for field in elastic_search.indices.get_mapping(
-                                index=_index
-                            )[_index]["mappings"]["properties"].keys()
-                        ]
+                        list(
+                            elastic_search.indices.get_mapping(index=_index)[_index][
+                                "mappings"
+                            ]["properties"].keys()
+                        )
                     )
                 }
             )
@@ -61,6 +87,7 @@ def get_fields_from_index():
         except elasticsearch.exceptions.NotFoundError as error:
             lg.error("Index not found: %s", error)
             return jsonify({"status": "Index not found"})
+    return jsonify({"status": "ElasticSearch is not connected"})
 
 
 @app.route("/insert", methods=["POST"])
@@ -182,13 +209,34 @@ def modify_data():
             lg.error("Error while modifying entry: %s", error)
             return jsonify(
                 {
-                    "status": f"Error while modifying entry from {old_entry} to {new_entry}: {error}"
+                    "status": f"Error while modifying entry from \
+                        {old_entry} to {new_entry}: {error}"
                 }
             )
 
 
 @app.route("/delete", methods=["POST"])
 def delete_data():
+    """
+    Deletes one or more entries from a specified ElasticSearch index.
+
+    Request body should contain the following parameters:
+    - 'table': name of the ElasticSearch index from which to delete entries.
+    - 'data': a list of dictionaries, where each dictionary represents an entry to be deleted.
+             Each dictionary should contain the following keys:
+    - 'values': a dictionary representing the entry to be deleted.
+             The keys in this dictionary should match the field names in the ElasticSearch index.
+
+    Returns a JSON response indicating the status of the delete operation:
+    - {'status': 'success'} if the delete operation was successful.
+    - {'status': 'Error while getting id from <entry>: <error message>'}
+      if there was an error while trying to retrieve the entry ID from ElasticSearch.
+    - {'status': 'Error while deleting entry from <entry>: <error message>'}
+      if there was an error while trying to delete the entry from ElasticSearch.
+    - {'status': 'ElasticSearch is not connected'} if the connection to ElasticSearch was 
+        not established.
+
+    """
     lg.debug("Delete request received: %s", request)
     data = request.get_json()
     data_dict = data["data"]

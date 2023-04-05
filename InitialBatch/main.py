@@ -139,7 +139,8 @@ def insert(
     # Take all tables from the database and insert them into ElasticSearch
     remove(connector, elastic)
     with connector.cursor() as cursor:
-        sql = "SHOW %s" % "TABLES"
+        table_name = "TABLES"
+        sql = f"SHOW {table_name}"
         cursor.execute(sql)
         lg.info("Inserting database into ElasticSearch. Please wait...")
         tables = cursor.fetchall()
@@ -149,16 +150,14 @@ def insert(
         table_name = table[0]
         lg.debug("\tInserting/Indexing table %s", table_name)
         with connector.cursor() as cursor:
-            sql = "DESCRIBE {}".format(table_name)
+            sql = f"DESCRIBE {table_name}"
             cursor.execute(sql)
-            schema = [{"name": column[0], "type": column[1]} for column in cursor.fetchall()]
+            schema = [
+                {"name": column[0], "type": column[1]} for column in cursor.fetchall()
+            ]
 
         # Crear el índice y el mapeo
-        index_mapping = {
-            "mappings": {
-                "properties": {}
-            }
-        }
+        index_mapping = {"mappings": {"properties": {}}}
 
         for column in schema:
             column_name = column["name"]
@@ -166,36 +165,50 @@ def insert(
             if column_type.startswith("varchar") or column_type.startswith("text"):
                 index_mapping["mappings"]["properties"][column_name] = {"type": "text"}
             elif column_type.startswith("int"):
-                index_mapping["mappings"]["properties"][column_name] = {"type": "integer"}
+                index_mapping["mappings"]["properties"][column_name] = {
+                    "type": "integer"
+                }
             elif column_type.startswith("float") or column_type.startswith("double"):
                 index_mapping["mappings"]["properties"][column_name] = {"type": "float"}
             elif column_type.startswith("bool"):
-                index_mapping["mappings"]["properties"][column_name] = {"type": "boolean"}
+                index_mapping["mappings"]["properties"][column_name] = {
+                    "type": "boolean"
+                }
             elif column_type.startswith("date") or column_type.startswith("time"):
                 index_mapping["mappings"]["properties"][column_name] = {"type": "date"}
             else:
-                index_mapping["mappings"]["properties"][column_name] = {"type": "keyword"}
+                index_mapping["mappings"]["properties"][column_name] = {
+                    "type": "keyword"
+                }
 
-        elastic_connection.indices.create(index=table_name, mappings=index_mapping["mappings"])
+        elastic_connection.indices.create(
+            index=table_name, mappings=index_mapping["mappings"]
+        )
 
         # Insertar los datos en Elasticsearch
         with connector.cursor() as cursor:
-            sql = "SELECT * FROM %s" % table_name #nosec
+            sql = "SELECT * FROM {table_name}"  # nosec
             cursor.execute(sql)
             while row := cursor.fetchone():
                 doc = {}
                 for i, value in enumerate(row):
                     column = schema[i]
                     if value is not None:
-                        if column["type"].startswith("varchar") or column["type"].startswith("text"):
+                        if column["type"].startswith("varchar") or column[
+                            "type"
+                        ].startswith("text"):
                             doc[column["name"]] = str(value)
                         elif column["type"].startswith("int"):
                             doc[column["name"]] = int(value)
-                        elif column["type"].startswith("float") or column["type"].startswith("double"):
+                        elif column["type"].startswith("float") or column[
+                            "type"
+                        ].startswith("double"):
                             doc[column["name"]] = float(value)
                         elif column["type"].startswith("bool"):
                             doc[column["name"]] = bool(value)
-                        elif column["type"].startswith("date") or column["type"].startswith("time"):
+                        elif column["type"].startswith("date") or column[
+                            "type"
+                        ].startswith("time"):
                             doc[column["name"]] = value.isoformat()
                         else:
                             doc[column["name"]] = value
