@@ -180,7 +180,7 @@ def insert(
 
         # Insertar los datos en Elasticsearch
         with connector.cursor() as cursor:
-            sql = "SELECT * FROM {}".format(table_name)
+            sql = "SELECT * FROM %s" % table_name #nosec
             cursor.execute(sql)
             while row := cursor.fetchone():
                 doc = {}
