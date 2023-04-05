@@ -88,7 +88,7 @@ def get_id_from_elastic(old_entry: dict, table: str) -> tuple:
         }
     }
 
-    lg.debug("Query to ElasticSearch: %s", query)
+    lg.debug("Query to table %s in ElasticSearch: %s", table, query)
     try:
         if elastic_search is None:
             lg.error("ElasticSearch is not connected")
@@ -136,9 +136,17 @@ def modify_data():
         if elastic_search is None:
             lg.error("ElasticSearch is not connected")
             return jsonify({"status": "ElasticSearch is not connected"})
-        resp = elastic_search.update(index=table, id=_id, body={"doc": new_entry})
-        lg.debug("Response from ElasticSearch: %s", resp)
-    return jsonify({"status": "success"})
+        try:
+            resp = elastic_search.update(index=table, id=_id, body={"doc": new_entry})
+            lg.debug("Response from ElasticSearch: %s", resp)
+            return jsonify({"status": "success"})
+        except Exception as error:
+            lg.error("Error while modifying entry: %s", error)
+            return jsonify(
+                {
+                    "status": f"Error while modifying entry from {old_entry} to {new_entry}: {error}"
+                }
+            )
 
 
 @app.route("/delete", methods=["POST"])
@@ -147,21 +155,26 @@ def delete_data():
     data = request.get_json()
     data_dict = data["data"]
     for delete in data_dict:
+        event = delete["values"]
         table = data["table"]
         # Get the id of the entry in ElasticSearch
-        _id = get_id_from_elastic(delete, table)
+        _id = get_id_from_elastic(event, table)
         if isinstance(_id, tuple):
             lg.error("Error while getting id: %s", _id[1])
-            return jsonify(
-                {"status": f"Error while getting id from {delete}: {_id[1]}"}
-            )
+            return jsonify({"status": f"Error while getting id from {event}: {_id[1]}"})
         # Modify the entry in ElasticSearch
         if elastic_search is None:
             lg.error("ElasticSearch is not connected")
             return jsonify({"status": "ElasticSearch is not connected"})
-        resp = elastic_search.delete(index=table, id=_id)
-        lg.debug("Response from ElasticSearch: %s", resp)
-    return jsonify({"status": "success"})
+        try:
+            resp = elastic_search.delete(index=table, id=_id)
+            lg.debug("Response from ElasticSearch: %s", resp)
+            return jsonify({"status": "success"})
+        except Exception as error:
+            lg.error("Error while deleting entry: %s", error)
+            return jsonify(
+                {"status": f"Error while deleting entry from {event}: {error}"}
+            )
 
 
 def connect_to_elastic() -> None:
