@@ -1,30 +1,23 @@
-import { useState, useEffect } from "react";
 import logo from "./logo.svg";
 import "./App.css";
-import { ReactSearchAutocomplete } from "react-search-autocomplete";
+import React, { Component } from "react";
+import { Dna } from "react-loader-spinner";
 
-function App() {
-  const [indexes, setIndexes] = useState([]);
-  const [selected, setSelected] = useState("");
-  const fields = [];
-
-  useEffect(() => {
-    fetch("http://localhost:5000/getindexes")
-      .then((response) => response.json())
-      .then((data) => {
-        setIndexes(data["indexes"]);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!selected) {
-      return;
-    }
-
-    const json = {
-      index: selected,
+class App extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      indexes: [],
+      fields: [],
+      selectedIndex: null,
     };
+  }
 
+  selectedIndexChanged = async (event) => {
+    this.setState({ selectedIndex: event.target.value }); // Actualizar el estado con el índice seleccionado
+    console.log(event.target.value);
+    const json = { index: event.target.value };
+    /* Make a fetch awaiting for response before continue */
     fetch("http://localhost:5000/getfields", {
       method: "POST",
       headers: {
@@ -32,47 +25,101 @@ function App() {
       },
       body: JSON.stringify(json),
     })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-        data["fields"].map((field) => {
-          <ReactSearchAutocomplete key={field} />;
-        });
+      .then((res) => res.json())
+      .then(async (fields) => {
+        await this.setState({ fields: fields["fields"] });
       });
-  }, [selected]);
-
-  const handleSelect = (event) => {
-    setSelected(event.target.value);
-    console.log(event.target.value);
   };
 
-  const onSearch = (string, results) => {
-    // onSearch will have as the first callback parameter
-    // the string searched and for the second the results.
-    console.log(string, results);
+  componentDidMount() {
+    fetch("http://localhost:5000/getindexes")
+      .then((res) => res.json())
+      .then((indexes) => this.setState({ indexes: indexes["indexes"] }));
+  }
+
+  parseFields = (field) => {
+    // Utilizar expresiones regulares para dividir el campo en palabras
+    const words = field.split(/(?=[A-Z0-9])|_/);
+
+    // Reemplazar guiones bajos con espacios en cada palabra y convertir la primera letra a mayúscula
+    const formattedWords = words.map((word) => {
+      // Si es un número, retornarlo tal cual
+      if (/^\d+$/.test(word)) {
+        return word;
+      }
+      // Si es una palabra, reemplazar guiones bajos con espacios y convertir la primera letra a mayúscula
+      else {
+        return word
+          .replace(/_/g, " ")
+          .replace(/^(.)(.*)$/, (match, p1, p2) => `${p1.toUpperCase()}${p2}`);
+      }
+    });
+
+    // Unir las palabras con espacios y retornar el resultado
+    return formattedWords.join(" ");
   };
 
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <div>
-          {indexes.map((index) => (
-            <label key={index}>
-              <input
-                type="radio"
-                value={index}
-                checked={selected === index}
-                onChange={handleSelect}
+  render() {
+    return (
+      <div className="App">
+        <header className="App-header">
+          <img src={logo} className="App-logo" alt="logo" />
+          {this.state.fields.length > 0 ? (
+            this.state.fields.map((field) => (
+              <div key={field}>
+                <label htmlFor={field}>{this.parseFields(field)}</label>
+                <input type="text" id={field} name={field}></input>
+              </div>
+            ))
+          ) : (
+            <div className="App-spinner">
+              <Dna
+                visible={true}
+                height="80"
+                width="80"
+                ariaLabel="dna-loading"
+                wrapperStyle={{}}
+                wrapperClass="dna-wrapper"
               />
-              {index}
               <br />
-            </label>
-          ))}
-        </div>
-      </header>
-    </div>
-  );
+              <h7>Waiting for user selection...</h7>
+            </div>
+          )}
+          {/* Create one label per index with a radio button if there is elements in the list. Only one can be selected at a time*/}
+          <div className="App-sidebar">
+            {this.state.indexes.length > 0 ? (
+              this.state.indexes.map((index) => (
+                <div key={index}>
+                  <input
+                    type="radio"
+                    id={index}
+                    name="answer"
+                    value={index}
+                    onChange={this.selectedIndexChanged}
+                  ></input>
+                  <label htmlFor={index}>{index}</label>
+                </div>
+              ))
+            ) : (
+              /* Render Dna element centered on the div */
+              <div className="App-spinner">
+                <Dna
+                  visible={true}
+                  height="80"
+                  width="80"
+                  ariaLabel="dna-loading"
+                  wrapperStyle={{}}
+                  wrapperClass="dna-wrapper"
+                />
+                <br />
+                <h7>Loading avaliable indexes...</h7>
+              </div>
+            )}
+          </div>
+        </header>
+      </div>
+    );
+  }
 }
 
 export default App;

@@ -22,7 +22,7 @@ def get_indexes_for_front():
     Returns:
         A JSON response containing a list of all non-system ElasticSearch indexes in
         alphabetical order. If there is an
-        error connecting to ElasticSearch, a JSON response containing an error message 
+        error connecting to ElasticSearch, a JSON response containing an error message
         is returned instead.
     """
     if elastic_search is not None:
@@ -67,20 +67,21 @@ def get_fields_from_index():
     """
     data = request.get_json()
     _index = data["index"]
+    lg.debug("Received request to get fields from index %s", _index)
     if elastic_search is not None:
         try:
             # Return all fields in the index
-            return jsonify(
-                {
-                    "fields": sorted(
-                        list(
-                            elastic_search.indices.get_mapping(index=_index)[_index][
-                                "mappings"
-                            ]["properties"].keys()
-                        )
+            response = {
+                "fields": sorted(
+                    list(
+                        elastic_search.indices.get_mapping(index=_index)[_index][
+                            "mappings"
+                        ]["properties"].keys()
                     )
-                }
-            )
+                )
+            }
+            lg.debug("Response to get fields from index %s: %s", _index, response)
+            return jsonify(response)
         except elasticsearch.exceptions.ConnectionError as error:
             lg.error("Connection error: %s", error)
             return jsonify({"status": "ElasticSearch is not connected"})
@@ -233,7 +234,7 @@ def delete_data():
       if there was an error while trying to retrieve the entry ID from ElasticSearch.
     - {'status': 'Error while deleting entry from <entry>: <error message>'}
       if there was an error while trying to delete the entry from ElasticSearch.
-    - {'status': 'ElasticSearch is not connected'} if the connection to ElasticSearch was 
+    - {'status': 'ElasticSearch is not connected'} if the connection to ElasticSearch was
         not established.
 
     """
