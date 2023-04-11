@@ -2,6 +2,7 @@ import logo from "./logo.svg";
 import "./App.css";
 import React, { Component } from "react";
 import { Dna } from "react-loader-spinner";
+import { ReactSearchAutocomplete } from "react-search-autocomplete";
 
 class App extends Component {
   constructor(props) {
@@ -10,12 +11,12 @@ class App extends Component {
       indexes: [],
       fields: [],
       selectedIndex: null,
+      items: [],
     };
   }
 
   selectedIndexChanged = async (event) => {
     this.setState({ selectedIndex: event.target.value }); // Actualizar el estado con el índice seleccionado
-    console.log(event.target.value);
     const json = { index: event.target.value };
     /* Make a fetch awaiting for response before continue */
     fetch("http://localhost:5000/getfields", {
@@ -32,6 +33,7 @@ class App extends Component {
   };
 
   componentDidMount() {
+    // While there is no anwser from the server, render a spinner
     fetch("http://localhost:5000/getindexes")
       .then((res) => res.json())
       .then((indexes) => this.setState({ indexes: indexes["indexes"] }));
@@ -51,12 +53,22 @@ class App extends Component {
       else {
         return word
           .replace(/_/g, " ")
-          .replace(/^(.)(.*)$/, (match, p1, p2) => `${p1.toUpperCase()}${p2}`);
+          .replace(/^(.)(.*)$/, (_, p1, p2) => `${p1.toUpperCase()}${p2}`);
       }
     });
 
     // Unir las palabras con espacios y retornar el resultado
     return formattedWords.join(" ");
+  };
+
+  formatResult = (item) => {
+    console.log(item);
+    return (
+      <div className="result-wrapper">
+        <span className="result-span">id: {item["id"]}</span>
+        <span className="result-span">name: {item["addressLine1"]}</span>
+      </div>
+    );
   };
 
   render() {
@@ -68,7 +80,45 @@ class App extends Component {
             this.state.fields.map((field) => (
               <div key={field}>
                 <label htmlFor={field}>{this.parseFields(field)}</label>
-                <input type="text" id={field} name={field}></input>
+                <div style={{ width: 300 }}>
+                  {/* Insert a ReactSearchAutocomplete element and onSearch, set callback on handleOnSearch function and send which field is from */}
+                  <ReactSearchAutocomplete
+                    items={this.state.items}
+                    formatResult={this.formatResult}
+                    onSearch={async (string, result) => {
+                      fetch("http://localhost:5000/search", {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          index: this.state.selectedIndex,
+                          field: field,
+                          query: string,
+                        }),
+                      }).then((res) => {
+                        res.json().then(async (items) => {
+                          if (items.length === 0) {
+                            return;
+                          }
+                          let newItems = [];
+                          // Obtain the keys of the first element of the array ["_source"]
+                          const keys = Object.keys(items[0]["_source"]);
+                          for (let i = 0; i < items.length; i++) {
+                            let item = {};
+                            for (let j = 0; j < keys.length; j++) {
+                              item[keys[j]] = items[i]["_source"][keys[j]];
+                            }
+                            /* Insert an id field */
+                            item["id"] = i;
+                            newItems.push(item);
+                          }
+                          await this.setState({ items: newItems });
+                        });
+                      });
+                    }}
+                  />
+                </div>
               </div>
             ))
           ) : (

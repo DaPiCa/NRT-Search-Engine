@@ -41,6 +41,7 @@
   display: none;
 }
 
+/* Add random border color */
 .App-sidebar label {
   position: relative;
   color: white;

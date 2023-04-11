@@ -91,6 +91,50 @@ def get_fields_from_index():
     return jsonify({"status": "ElasticSearch is not connected"})
 
 
+@app.route("/search", methods=["POST"])
+def search():
+    data = request.get_json()
+    _index = data["index"]
+    _field = data["field"]
+    _query_text = data["query"]
+    query = {
+        "query": {
+            "bool": {
+                "should": [
+                    {
+                        "match_phrase": {
+                            _field: {
+                                "query": _query_text,
+                                "boost": 1.0,  # Puedes ajustar el valor del boost según tus necesidades
+                            }
+                        }
+                    },
+                    {
+                        "term": {
+                            _field: {
+                                "value": _query_text,
+                                "boost": 10.0,  # Puedes ajustar el valor del boost según tus necesidades
+                            }
+                        }
+                    },
+                    {
+                        "match_phrase_prefix": {
+                            _field: {
+                                "query": _query_text,
+                                "boost": 1.0,  # Puedes ajustar el valor del boost según tus necesidades
+                            }
+                        },
+                    },
+                ],
+                "minimum_should_match": 1,
+            }
+        }
+    }
+    response = elastic_search.search(index=_index, body=query)
+    lg.debug("Response from ElasticSearch: %s", response)
+    return jsonify(response["hits"]["hits"])
+
+
 @app.route("/insert", methods=["POST"])
 def insert_data() -> Response:
     """
