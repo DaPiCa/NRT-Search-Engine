@@ -31,7 +31,7 @@ def insert(msg: ConsumerRecord) -> None:
     )
     try:
         post = requests.post(
-            f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/insert",
+            f"http://{os.getenv('API_ELASTIC_HOST')}:{os.getenv('API_ELASTIC_PORT')}/insert",
             json=json.loads(msg.value.decode("utf-8")),
             timeout=5,
         )
@@ -61,7 +61,7 @@ def modification(msg: ConsumerRecord) -> None:
         )
         try:
             post = requests.post(
-                f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/modify",
+                f"http://{os.getenv('API_ELASTIC_HOST')}:{os.getenv('API_ELASTIC_PORT')}/modify",
                 json=json.loads(msg.value.decode("utf-8")),
                 timeout=5,
             )
@@ -86,7 +86,7 @@ def delete(msg: ConsumerRecord) -> None:
     )
     try:
         post = requests.post(
-            f"http://{os.getenv('API_HOST')}:{os.getenv('API_PORT')}/delete",
+            f"http://{os.getenv('API_ELASTIC_HOST')}:{os.getenv('API_ELASTIC_PORT')}/delete",
             json=json.loads(msg.value.decode("utf-8")),
             timeout=5,
         )
