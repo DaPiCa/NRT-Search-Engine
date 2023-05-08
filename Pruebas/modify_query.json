@@ -1,0 +1,31 @@
+{
+  "type": "update",
+  "data": [
+    {
+      "before": {
+        "officeCode": "8",
+        "city": "Madrid",
+        "phone": "+666",
+        "addressLine1": "Calle Central",
+        "addressLine2": "Numero 5",
+        "state": "MAD",
+        "country": "Spain",
+        "postalCode": "56564",
+        "territory": "Esp"
+      },
+      "after": {
+        "officeCode": "8",
+        "city": "Madrid",
+        "phone": "+666",
+        "addressLine1": "Gran Via",
+        "addressLine2": "Numero 5",
+        "state": "MAD",
+        "country": "Spain",
+        "postalCode": "56564",
+        "territory": "Esp"
+      }
+    }
+  ],
+  "timestamp": 1680689685.6150432,
+  "table": "offices"
+}
