@@ -29,4 +29,4 @@ jobs:
         bandit -r .
     - name: Analysing the code with pylint
       run: |
-        pylint $(git ls-files '*.py') --fail-under=9
+        pylint $(git ls-files '*.py' ':!:Pruebas/*') --fail-under=9

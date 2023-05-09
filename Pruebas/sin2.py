@@ -26,5 +26,6 @@ if __name__=="__main__":
     sentence = list_without_prepositions(input_word)
     for word in sentence:
         consulta = ps.consulta(word)
-        formatted = ps.elastic_formatter(consulta[0], consulta[1])
-        ps.lg.info(formatted)
+        if(consulta[1]):
+            formatted = ps.elastic_formatter(consulta[0], consulta[1])
+            ps.lg.info(formatted)
