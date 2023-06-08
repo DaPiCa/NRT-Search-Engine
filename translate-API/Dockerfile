@@ -1,11 +1,10 @@
-FROM pypy:3.9-7.3.11-slim
+FROM python:3.8-slim
 
-COPY main.py .
+COPY app.py .
 COPY requirements.txt .
-COPY scripts.py .
 
 # RUN pip install --upgrade pip
 
 RUN pip install -r requirements.txt
 
-CMD ["pypy3", "main.py"]
+CMD ["python3", "app.py"]

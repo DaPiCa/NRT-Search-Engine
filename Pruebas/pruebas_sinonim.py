@@ -1,11 +1,10 @@
 import nltk
-
-nltk.download("omw")
-from nltk.corpus import wordnet
 import time
 import random
 import logging as lg
 import logging.config as lg_conf
+nltk.download("omw", quiet=True)
+from nltk.corpus import wordnet
 
 
 def formatter(string):
@@ -44,7 +43,8 @@ def stats():
     random_words = random.sample(words, SAMPLE)
     t0 = time.time()
     for word in random_words:
-        lg.info(synonym_searcher(word))
+        con = consulta(word)
+        lg.info(elastic_formatter(con[0], con[1]))
     t1 = time.time()
     lg.debug(f"\n\n\t{SAMPLE} random words in {t1-t0} seconds")
 

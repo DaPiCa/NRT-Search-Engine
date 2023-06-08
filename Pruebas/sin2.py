@@ -28,4 +28,4 @@ if __name__=="__main__":
         consulta = ps.consulta(word)
         if(consulta[1]):
             formatted = ps.elastic_formatter(consulta[0], consulta[1])
-            ps.lg.info(formatted)
+            lg.info(formatted)

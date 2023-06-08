@@ -4,6 +4,8 @@ import time
 import logging as lg
 import logging.config as lg_conf
 
+import scripts as sc
+
 import mysql.connector  # pylint: disable=import-error
 import elasticsearch  # pylint: disable=import-error
 
@@ -212,7 +214,12 @@ def insert(
                             doc[column["name"]] = value.isoformat()
                         else:
                             doc[column["name"]] = value
-                elastic_connection.index(index=table_name, document=doc)
+                lg.debug("\t\tInserting document %s", doc)
+                multilenguage = sc.translate_data(doc)
+                for lang in multilenguage:
+                    elastic_connection.index(
+                        index=table_name, document=multilenguage[lang], routing=lang
+                    )
 
     conn.close()
     lg.info("Database inserted into ElasticSearch")

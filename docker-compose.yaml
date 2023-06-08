@@ -25,7 +25,7 @@ services:
       InitialBatch:
         condition: service_completed_successfully
       persistence:
-          condition: service_healthy
+        condition: service_healthy
     env_file:
       - .env
 
@@ -94,11 +94,17 @@ services:
     ports:
       - ${ELASTIC_PORT}:${ELASTIC_PORT}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${ELASTIC_PORT}"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${ELASTIC_PORT}"
+        ]
       interval: 30s
       timeout: 30s
       retries: 30
-      
+
   kibana:
     container_name: kb-container
     image: docker.elastic.co/kibana/kibana:8.7.1
@@ -108,7 +114,7 @@ services:
       - elasticsearch
     ports:
       - 5601:5601
-  
+
   InitialBatch:
     image: initialbatch:latest
     hostname: initialbatch
@@ -148,3 +154,12 @@ services:
       - .env
     ports:
       - "0.0.0.0:${API_USER_PORT}:${API_USER_PORT}"
+
+  translator-API:
+    image: translate-api:latest
+    hostname: translate-api
+    build: ./translate-api
+    env_file:
+      - .env
+    ports:
+      - "1212:1212"
