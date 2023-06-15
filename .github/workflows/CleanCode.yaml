@@ -26,7 +26,7 @@ jobs:
         pip install -r ./Producer/requirements.txt
     - name: Analysing the code with bandit
       run: |
-        bandit -r . --exclude Pruebas
+        bandit -r . --exclude Pruebas/*
     - name: Analysing the code with pylint
       run: |
         pylint $(git ls-files '*.py' ':!:Pruebas/*') --fail-under=9

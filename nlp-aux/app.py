@@ -25,7 +25,7 @@ lg_conf.dictConfig(
 )
 lg.basicConfig(
     format="%(asctime)s | %(filename)s | %(levelname)s |>> %(message)s",
-    level=lg.INFO,
+    level=lg.DEBUG,
 )
 
 avaliable_languages = {

@@ -218,7 +218,7 @@ def insert(
                         else:
                             doc[column["name"]] = value
 
-                # lg.debug("\t\tInserting document %s", doc)
+                lg.debug("\t\tInserting document %s", doc)
                 msg_lang = {}
                 for clave, valor in doc.items():
                     clave_encapsulada = (
@@ -233,13 +233,13 @@ def insert(
                 }
                 original_lang = requests.get(
                     f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/detectLanguage",
-                    params=msg,
+                    params=msg, timeout=10
                 ).json()
-                # lg.debug("\t\tDetected language %s", original_lang)
+                lg.debug("\t\tDetected language %s", original_lang)
                 msg["from_lang"] = original_lang
                 multilenguage = requests.get(
                     f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
-                    params=msg,
+                    params=msg, timeout=10
                 ).json()
                 if multilenguage is None:
                     lg.error("Error translating %s", msg)
