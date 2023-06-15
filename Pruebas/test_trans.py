@@ -1,54 +1,32 @@
-from decimal import Decimal
-from translate import Translator
-from langdetect import detect
+import re
+from langid import classify
 
-
-def translate_data(data: dict) -> list:
-    avaliable_languages = ["es", "en", "it", "fr", "de", "pt"]
-    original_lang = identify_lang(str(data))
-    translated_data = []
-    translated_data.append({"lang": original_lang, "data": data})
-    for lang in avaliable_languages:
-        if lang != original_lang:
-            translated_data.append({"lang": lang, "data": translate_to(lang, data)})
-    return translated_data
-
-
-def translate_to(language: str, data: dict) -> dict:
-    """
-    A helper function to translate the values of a dictionary from any lenguage to the
-    specified language.
-
-    Args:
-        language (str): A string representing the language to translate to.
-        data (dict): A dictionary object representing the data to translate.
-    """
-    translator = Translator(to_lang=language)
-    for key, value in data.items():
-        # Check if is instance of str
-        if value is not None and value != "":
-            data[key] = translator.translate(value)
-    return data
-
-
-def identify_lang(text: str) -> str:
+def identify_lang(text: dict) -> str:
     """
     A helper function to identify the language of a given text.
 
     Args:
-        text (str): A string representing the text to identify the language of.
+        text (dict): A dict representing the text to identify the language of.
 
     Returns:
         str: A string representing the language of the given text.
     """
-    return detect(text)
+    # Check every value of the dict
+    languages = []
+    for value in text.values():
+        if isinstance(value, str) and re.search(r'[a-zA-Z]', value):  # Filtrar solo valores con letras
+            language = classify(value)[0]
+            languages.append(language)
+    # Return the most common language
+    print(languages)
+    return max(set(languages), key=languages.count)
 
 
 example = {
     "customerNumber": "103",
     "customerName": "Atelier graphique",
     "contactLastName": "Schmitt",
-    "contactFirstName": "Carine ",
+    "contactFirstName": "Buenas tardes",
     "phone": "40.32.2555",
     "addressLine1": "54, rue Royale",
     "city": "Nantes",
@@ -58,4 +36,4 @@ example = {
     "creditLimit": 'Decimal("21000.00")',
 }
 
-print(translate_data(example))
+print(identify_lang(example))

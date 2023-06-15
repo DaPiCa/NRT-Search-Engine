@@ -124,6 +124,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      NLP-API:
+        condition: service_healthy
     env_file:
       - .env
 
@@ -155,11 +157,22 @@ services:
     ports:
       - "0.0.0.0:${API_USER_PORT}:${API_USER_PORT}"
 
-  translator-API:
-    image: translate-api:latest
-    hostname: translate-api
-    build: ./translate-api
+  NLP-API:
+    image: nlp-api:latest
+    hostname: nlp-api
+    build: ./nlp-aux
     env_file:
       - .env
     ports:
-      - "1212:1212"
+      - "${NLP_PORT}:${NLP_PORT}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${NLP_PORT}/healthcheck"
+        ]
+      interval: 30s
+      timeout: 30s
+      retries: 30

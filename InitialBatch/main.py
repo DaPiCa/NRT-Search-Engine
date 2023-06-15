@@ -1,13 +1,12 @@
+import logging as lg
+import logging.config as lg_conf
 import os
 import sys
 import time
-import logging as lg
-import logging.config as lg_conf
 
-import scripts as sc
-
-import mysql.connector  # pylint: disable=import-error
 import elasticsearch  # pylint: disable=import-error
+import mysql.connector  # pylint: disable=import-error
+import requests
 
 
 def connect_to_database() -> mysql.connector.connection.MySQLConnection:
@@ -140,6 +139,8 @@ def insert(
     """
     # Take all tables from the database and insert them into ElasticSearch
     remove(connector, elastic)
+    total_time = 0
+    total_rows = 0
     with connector.cursor() as cursor:
         table_name = "TABLES"
         sql = f"SHOW {table_name}"
@@ -192,6 +193,8 @@ def insert(
             sql = f"SELECT * FROM {table_name}"  # nosec
             cursor.execute(sql)
             while row := cursor.fetchone():
+                total_rows += 1
+                t0 = time.time()
                 doc = {}
                 for i, value in enumerate(row):
                     column = schema[i]
@@ -214,15 +217,46 @@ def insert(
                             doc[column["name"]] = value.isoformat()
                         else:
                             doc[column["name"]] = value
-                lg.debug("\t\tInserting document %s", doc)
-                multilenguage = sc.translate_data(doc)
-                for lang in multilenguage:
-                    elastic_connection.index(
-                        index=table_name, document=multilenguage[lang], routing=lang
+
+                # lg.debug("\t\tInserting document %s", doc)
+                msg_lang = {}
+                for clave, valor in doc.items():
+                    clave_encapsulada = (
+                        f"'{clave}'" if not isinstance(clave, str) else clave
                     )
+                    valor_encapsulado = (
+                        repr(valor) if not isinstance(valor, str) else valor
+                    )
+                    msg_lang[clave_encapsulada] = valor_encapsulado
+                msg = {
+                    "text": str(msg_lang),
+                }
+                original_lang = requests.get(
+                    f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/detectLanguage",
+                    params=msg,
+                ).json()
+                # lg.debug("\t\tDetected language %s", original_lang)
+                msg["from_lang"] = original_lang
+                multilenguage = requests.get(
+                    f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
+                    params=msg,
+                ).json()
+                if multilenguage is None:
+                    lg.error("Error translating %s", msg)
+                    continue
+                else:
+                    for lang in multilenguage:
+                        elastic_connection.index(
+                            index=table_name, document=multilenguage[lang], routing=lang
+                        )
+                t1 = time.time()
+                total_time += t1 - t0
 
     conn.close()
     lg.info("Database inserted into ElasticSearch")
+    lg.info("Total time: %s seconds", total_time)
+    lg.info("Total rows: %s", total_rows)
+    lg.info("Average time per row: %s", total_time / total_rows)
 
 
 if __name__ == "__main__":
