@@ -106,7 +106,7 @@ def remove(
                 lg.debug("\tRemoving indexed documents from %s", table[0])
                 table_name = table[0]
                 query = {"query": {"match_all": {}}}
-                elastic_connection.delete_by_query(index=table_name, body=query)
+                elastic_connection.delete_by_query(index=table_name, body=query, wait_for_completion=True)
                 lg.debug("\tRemoving index %s", table[0])
                 elastic_connection.indices.delete(index=table_name)
         lg.info("Database removed from ElasticSearch")
@@ -233,16 +233,17 @@ def insert(
                 }
                 original_lang = requests.get(
                     f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/detectLanguage",
-                    params=msg, timeout=10
+                    params=msg
                 ).json()
                 lg.debug("\t\tDetected language %s", original_lang)
                 msg["from_lang"] = original_lang
                 multilenguage = requests.get(
                     f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
-                    params=msg, timeout=10
+                    params=msg
                 ).json()
+                lg.debug("\t\tTranslated document %s", multilenguage)
                 if multilenguage is None:
-                    lg.error("Error translating %s", msg)
+                    lg.error("Error translating %s, language %s not supported", msg, original_lang)
                     continue
                 else:
                     for lang in multilenguage:

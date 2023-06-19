@@ -3,6 +3,7 @@ FROM python:3.8-slim
 COPY app.py .
 COPY requirements.txt .
 COPY models models
+COPY core core
 COPY es_core_news_md-3.5.0-py3-none-any.whl .
 
 RUN pip install -r requirements.txt

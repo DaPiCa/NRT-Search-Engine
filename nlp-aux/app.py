@@ -7,8 +7,7 @@ import os
 import pathlib
 import re
 
-import argostranslate.package
-import argostranslate.translate
+import core.translate as translate
 import nltk
 import spacy
 from fastapi import FastAPI
@@ -52,8 +51,7 @@ for model in models:
         )
     except KeyError:
         lg.error(f"\tInstalling unsupported language model: {model}")
-    argostranslate.package.install_from_path(pathlib.Path(model))
-
+    translate.package.install_from_path(pathlib.Path(model))
 lg.info("Installing Spacy model")
 synonims = spacy.load("es_core_news_md")
 
@@ -72,14 +70,16 @@ def formatter(string):
 
 def synonym_searcher(word):
     synonyms = []
-    for syn in wordnet.synsets(word, lang="spa"):
-        for l in syn.lemmas(lang="spa"):
-            synonyms.append(l.name())
-    synonyms = list(set(synonyms))
-    if word.lower() in [x.lower() for x in synonyms]:
-        lower_list = [x.lower() for x in synonyms]
-        index = lower_list.index(word.lower())
-        synonyms.pop(index)
+    synsets = wordnet.synsets(word, lang="spa")
+    if synsets is not None:
+        for syn in synsets:
+            for l in syn.lemmas(lang="spa"):
+                synonyms.append(l.name())
+        synonyms = list(set(synonyms))
+        if word.lower() in [x.lower() for x in synonyms]:
+            lower_list = [x.lower() for x in synonyms]
+            index = lower_list.index(word.lower())
+            synonyms.pop(index)
     new_list = []
     for words in synonyms:
         new_list.append(formatter(words))
@@ -136,17 +136,18 @@ def translateAll(text: str, from_lang: str):
                 if isinstance(value, str) and re.search(r"[a-zA-Z]", value):
                     lg.debug(f"\t\tTranslating {value}")
                     if available_lang == "en" or from_lang == "en":
-                        translation = argostranslate.translate.translate(
+                        translation = translate.translate(
                             value, from_lang, available_lang
                         )
                     else:
-                        translation = argostranslate.translate.translate(
+                        translation = translate.translate(
                             value, from_lang, "en"
                         )
-                        translation = argostranslate.translate.translate(
+                        translation = translate.translate(
                             translation, "en", available_lang
                         )
                     translated_text[available_lang][key] = translation
+    lg.debug(f"Translated text: {translated_text}")
     return translated_text
 
 
