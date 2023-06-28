@@ -49,4 +49,4 @@ typing_extensions==4.6.3
 urllib3==2.0.3
 uvicorn==0.22.0
 wasabi==1.1.2
-langid==1.1.6
+py3langid==0.2.2

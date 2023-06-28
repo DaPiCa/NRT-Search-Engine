@@ -11,7 +11,7 @@ import core.translate as translate
 import nltk
 import spacy
 from fastapi import FastAPI
-from langid import classify
+from py3langid import classify
 
 nltk.download("omw", quiet=True)
 from nltk.corpus import wordnet
