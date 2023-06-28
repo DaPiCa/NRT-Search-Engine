@@ -141,6 +141,13 @@ def insert(
     remove(connector, elastic)
     total_time = 0
     total_rows = 0
+    try:
+        available_languages = requests.get(
+                        f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/avaliableLanguages"
+                    ).json()
+    except requests.exceptions.ConnectionError as error:
+        lg.error("Connection to NLP API error: %s", error)
+        available_languages = {}
     with connector.cursor() as cursor:
         table_name = "TABLES"
         sql = f"SHOW {table_name}"
@@ -151,7 +158,7 @@ def insert(
     for table in tables:
         # Obtener el esquema de la tabla
         table_name = table[0]
-        lg.debug("\tInserting/Indexing table %s", table_name)
+        lg.info("\tInserting/Indexing table %s", table_name)
         with connector.cursor() as cursor:
             sql = f"DESCRIBE {table_name}"
             cursor.execute(sql)
@@ -235,21 +242,27 @@ def insert(
                     f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/detectLanguage",
                     params=msg
                 ).json()
-                lg.debug("\t\tDetected language %s", original_lang)
-                msg["from_lang"] = original_lang
-                multilenguage = requests.get(
-                    f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
-                    params=msg
-                ).json()
-                lg.debug("\t\tTranslated document %s", multilenguage)
-                if multilenguage is None:
-                    lg.error("Error translating %s, language %s not supported", msg, original_lang)
-                    continue
+                if available_languages != [] and original_lang in available_languages.keys():
+                    msg["from_lang"] = original_lang
+                    try:
+                        multilenguage = requests.get(
+                            f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
+                            params=msg
+                        ).json()
+                        if multilenguage is None:
+                            lg.error("Error translating %s, language %s not supported", msg, original_lang)
+                            continue
+                        else:
+                            for lang in multilenguage:
+                                elastic_connection.index(
+                                    index=table_name, document=multilenguage[lang], routing=lang
+                                )
+                    except requests.exceptions.ConnectionError as error:
+                        lg.error("Connection to NLP API error: %s", error)
+                        elastic_connection.index(index=table_name, document=doc)
                 else:
-                    for lang in multilenguage:
-                        elastic_connection.index(
-                            index=table_name, document=multilenguage[lang], routing=lang
-                        )
+                    lg.error("Error translating %s, language %s not supported", msg, original_lang)
+                    elastic_connection.index(index=table_name, document=doc)
                 t1 = time.time()
                 total_time += t1 - t0
 

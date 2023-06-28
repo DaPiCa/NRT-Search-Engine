@@ -24,7 +24,7 @@ lg_conf.dictConfig(
 )
 lg.basicConfig(
     format="%(asctime)s | %(filename)s | %(levelname)s |>> %(message)s",
-    level=lg.DEBUG,
+    level=lg.INFO,
 )
 
 avaliable_languages = {
@@ -70,10 +70,10 @@ def formatter(string):
 
 def synonym_searcher(word):
     synonyms = []
-    synsets = wordnet.synsets(word, lang="spa")
+    synsets = wordnet.synsets(word)
     if synsets is not None:
         for syn in synsets:
-            for l in syn.lemmas(lang="spa"):
+            for l in syn.lemmas():
                 synonyms.append(l.name())
         synonyms = list(set(synonyms))
         if word.lower() in [x.lower() for x in synonyms]:
@@ -115,39 +115,54 @@ def synonyms(text: str):
 def healthcheck():
     return "OK"
 
+@app.get("/avaliableLanguages")
+def avaliableLanguages():
+    return avaliable_languages
 
 @app.get("/translateAll")
-def translateAll(text: str, from_lang: str):
-    lg.debug(
-        f"Received request to translate {text} from {from_lang} ({avaliable_languages[from_lang]}) to all languages"
-    )
-    if from_lang not in avaliable_languages.keys():
-        lg.error(f"Language {from_lang} not supported")
+def translateAll(text: str, from_lang: str) -> dict | None:
+    """
+    Translates a dictionary of text from one language to all other available languages.
+
+    Args:
+        text (str): A dictionary of text to be translated.
+        from_lang (str): The language code of the source language.
+
+    Returns:
+        dict: A dictionary of translated text for each available language.
+    """
+    # Check if the source language is available
+    if from_lang not in avaliable_languages:
         return None
+
+    # Convert the input text to a dictionary
     new_text_dic = ast.literal_eval(text)
+
+    # Create an empty dictionary to store the translated text
     translated_text = {}
-    for available_lang in avaliable_languages.keys():
+
+    # Iterate over all available languages
+    for available_lang in avaliable_languages:
+        # Skip the source language
         if available_lang != from_lang:
-            lg.debug(
-                f"\tTranslating to {available_lang} ({avaliable_languages[available_lang]})"
-            )
+            # Create an empty dictionary for the translated text in the current language
             translated_text[available_lang] = {}
+
+            # Iterate over all keys and values in the input dictionary
             for key, value in new_text_dic.items():
+                # Check if the value is a string and contains letters
                 if isinstance(value, str) and re.search(r"[a-zA-Z]", value):
-                    lg.debug(f"\t\tTranslating {value}")
+                    # Translate the value to the current language
                     if available_lang == "en" or from_lang == "en":
-                        translation = translate.translate(
-                            value, from_lang, available_lang
-                        )
+                        translation = translate.translate(value, from_lang, available_lang)
                     else:
-                        translation = translate.translate(
-                            value, from_lang, "en"
-                        )
-                        translation = translate.translate(
-                            translation, "en", available_lang
-                        )
+                        translation = translate.translate(value, from_lang, "en")
+                        translation = translate.translate(translation, "en", available_lang)
+
+                    # Add the translated value to the dictionary of translated text
                     translated_text[available_lang][key] = translation
-    lg.debug(f"Translated text: {translated_text}")
+
+    # Return the dictionary of translated text
     return translated_text
 
 
