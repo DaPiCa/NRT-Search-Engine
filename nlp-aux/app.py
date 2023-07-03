@@ -115,12 +115,32 @@ def synonyms(text: str):
 def healthcheck():
     return "OK"
 
+
 @app.get("/avaliableLanguages")
 def avaliableLanguages():
     return avaliable_languages
 
+
+from queue import Queue
+import threading
+
+
+def translateText(original: dict, from_lang: str, to_lang: str, result_queue: Queue):
+    translated_text = {}
+
+    # Itera sobre todas las claves y valores en el diccionario original
+    for key, value in original.items():
+        # Verifica si el valor es una cadena y contiene letras
+        if isinstance(value, str) and re.search(r"[a-zA-Z]", value):
+            # Traduce el valor al idioma actual
+            translation = translate.translate(value, from_lang, to_lang)
+            # Agrega el valor traducido al diccionario de texto traducido
+            translated_text[key] = translation
+
+    result_queue.put((to_lang, translated_text))
+
 @app.get("/translateAll")
-def translateAll(text: str, from_lang: str) -> dict | None:
+def translateAll(text: str, from_lang: str) -> dict or None:
     """
     Translates a dictionary of text from one language to all other available languages.
 
@@ -131,38 +151,36 @@ def translateAll(text: str, from_lang: str) -> dict | None:
     Returns:
         dict: A dictionary of translated text for each available language.
     """
-    # Check if the source language is available
+    # Verifica si el idioma fuente está disponible
     if from_lang not in avaliable_languages:
         return None
 
-    # Convert the input text to a dictionary
+    # Convierte el texto de entrada en un diccionario
     new_text_dic = ast.literal_eval(text)
 
-    # Create an empty dictionary to store the translated text
+    # Crea un diccionario vacío para almacenar el texto traducido
     translated_text = {}
 
-    # Iterate over all available languages
+    result_queue = Queue()
+
+    threads = []
+
+    # Itera sobre todos los idiomas disponibles
     for available_lang in avaliable_languages:
-        # Skip the source language
+        # Omite el idioma fuente
         if available_lang != from_lang:
-            # Create an empty dictionary for the translated text in the current language
-            translated_text[available_lang] = {}
+            thread = threading.Thread(target=translateText, args=(new_text_dic, from_lang, available_lang, result_queue))
+            threads.append(thread)
+            thread.start()
 
-            # Iterate over all keys and values in the input dictionary
-            for key, value in new_text_dic.items():
-                # Check if the value is a string and contains letters
-                if isinstance(value, str) and re.search(r"[a-zA-Z]", value):
-                    # Translate the value to the current language
-                    if available_lang == "en" or from_lang == "en":
-                        translation = translate.translate(value, from_lang, available_lang)
-                    else:
-                        translation = translate.translate(value, from_lang, "en")
-                        translation = translate.translate(translation, "en", available_lang)
+    for thread in threads:
+        thread.join()
 
-                    # Add the translated value to the dictionary of translated text
-                    translated_text[available_lang][key] = translation
+    while not result_queue.empty():
+        lang, thread_translated_text = result_queue.get()
+        translated_text[lang] = thread_translated_text
 
-    # Return the dictionary of translated text
+    # Devuelve el diccionario de texto traducido
     return translated_text
 
 

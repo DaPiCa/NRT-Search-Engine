@@ -265,6 +265,7 @@ def insert(
                     elastic_connection.index(index=table_name, document=doc)
                 t1 = time.time()
                 total_time += t1 - t0
+                lg.info("Inserted document from table %s in %s. Average time per row %s. Total rows: %s", table_name, t1 - t0, total_time / total_rows, total_rows)
 
     conn.close()
     lg.info("Database inserted into ElasticSearch")
@@ -282,7 +283,7 @@ if __name__ == "__main__":
     )
     lg.basicConfig(
         format="%(asctime)s | %(filename)s | %(levelname)s |>> %(message)s",
-        level=lg.DEBUG,
+        level=lg.INFO,
     )
     conn = connect_to_database()
     elastic = connect_to_elastic()
