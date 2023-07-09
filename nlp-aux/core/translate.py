@@ -430,7 +430,7 @@ def apply_packaged_translation(
 
         # Get sbd translation
         sbd_package = sbd.get_sbd_package()
-        assert sbd_package is not None
+        assert sbd_package is not None # nosec
         sbd_translation = PackageTranslation(None, None, sbd_package)
 
         while start_index < len(input_text) - 1:
