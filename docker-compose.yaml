@@ -91,6 +91,7 @@ services:
     environment:
       - xpack.security.enabled=false
       - "discovery.type=single-node"
+      - "ES_JAVA_OPTS=-Xms1024m -Xmx1024m"
     ports:
       - ${ELASTIC_PORT}:${ELASTIC_PORT}
     healthcheck:
@@ -123,8 +124,6 @@ services:
       persistence:
         condition: service_healthy
       elasticsearch:
-        condition: service_healthy
-      NLP-API:
         condition: service_healthy
     env_file:
       - .env
@@ -166,13 +165,7 @@ services:
     ports:
       - "${NLP_PORT}:${NLP_PORT}"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "http://localhost:${NLP_PORT}"
-        ]
+      test: [ "CMD", "curl", "-f", "http://localhost:${NLP_PORT}" ]
       interval: 5s
       timeout: 30s
       retries: 50

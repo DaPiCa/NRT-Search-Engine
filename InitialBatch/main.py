@@ -1,5 +1,6 @@
 # pylint: disable=import-error
 
+import json
 import logging as lg
 import logging.config as lg_conf
 import os
@@ -146,14 +147,20 @@ def insert(
     total_time = 0
     total_rows = 0
     lista_sinonimos = []
-    try:
-        available_languages = requests.get(
-            f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/avaliableLanguages",
-            timeout=None,
-        ).json()  # nosec
-    except requests.exceptions.ConnectionError as error:
-        lg.error("Connection to NLP API error: %s", error)
-        available_languages = {}
+    api_limit_time = time.time() + 120
+    available_languages = {}
+    while time.time() < api_limit_time:
+        try:
+            response = requests.get(
+                f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/avaliableLanguages",
+                timeout=None,
+            )  # nosec
+            available_languages = response.json()
+            break  # Si se obtiene una respuesta exitosa, se sale del bucle
+        except requests.exceptions.ConnectionError as error:
+            lg.error("Connection to NLP API error: %s", error)
+    if not available_languages:
+        lg.error("NLP API not available. Indexing without synonyms and translations")
     with connector.cursor() as cursor:
         table_name = "TABLES"
         sql = f"SHOW {table_name}"
@@ -267,16 +274,18 @@ def insert(
                                 original_lang,
                             )
                             continue
-
                         for lang in multilenguage:
                             elastic_connection.index(
                                 index=table_name,
                                 document=multilenguage[lang],
                                 routing=lang,
                             )
+                        msg = {
+                            "text": str(msg_lang),
+                        }
                         sinonimos = requests.get(
                             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/synonyms",
-                            params=msg["text"],
+                            params=msg,
                             timeout=None,
                         )  # nosec
                         if sinonimos is None or sinonimos == []:
@@ -287,6 +296,9 @@ def insert(
 
                     except requests.exceptions.ConnectionError as error:
                         lg.error("Connection to NLP API error: %s", error)
+                        elastic_connection.index(index=table_name, document=doc)
+                    except json.decoder.JSONDecodeError as error:
+                        lg.error("Error decoding JSON: %s", error)
                         elastic_connection.index(index=table_name, document=doc)
                 else:
                     lg.error(
@@ -304,6 +316,8 @@ def insert(
                     total_time / total_rows,
                     total_rows,
                 )
+        lg.info("Inserting synonyms into ElasticSearch")
+        lg.info("Synonyms: %s", lista_sinonimos)
         if lista_sinonimos != []:
             lg.info("Inserting synonyms into ElasticSearch")
             body = {

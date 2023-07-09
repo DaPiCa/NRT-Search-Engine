@@ -13,13 +13,14 @@ from core import translate
 from fastapi import FastAPI
 from py3langid import classify
 
-nltk.download("omw", quiet=True)
+nltk.download("wordnet", quiet=False)
+nltk.download("omw", quiet=False)
 from nltk.corpus import wordnet
 
 lg_conf.dictConfig(
     {
         "version": 1,
-        "disable_existing_loggers": True,
+        "disable_existing_loggers": False,
     }
 )
 lg.basicConfig(
@@ -54,8 +55,23 @@ for model in models:
     except KeyError:
         lg.error("\tInstalling unsupported language model: %s", model)
     translate.package.install_from_path(pathlib.Path(model))
-lg.info("Installing Spacy model")
-synonims = spacy.load("es_core_news_md")
+lg.info("Installing Spacy models")
+
+synonims_es = spacy.load("es_core_news_sm")
+synonims_en = spacy.load("en_core_web_sm")
+synonims_fr = spacy.load("fr_core_news_sm")
+synonims_de = spacy.load("de_core_news_sm")
+synonims_it = spacy.load("it_core_news_sm")
+synonims_pt = spacy.load("pt_core_news_sm")
+
+synonims = {
+    "es": synonims_es,
+    "en": synonims_en,
+    "fr": synonims_fr,
+    "de": synonims_de,
+    "it": synonims_it,
+    "pt": synonims_pt,
+}
 
 lg.info("Done installing packages. Starting API...")
 app = FastAPI()
@@ -143,7 +159,7 @@ def elastic_formatter(word: str, synonyms_list: list) -> str:
 
 
 @app.get("/synonyms")
-def synonyms(text: str):
+def synonyms_(text: str):
     """
     Esta función busca sinónimos de las palabras en un texto utilizando la biblioteca Spacy y WordNet.
 
@@ -156,17 +172,20 @@ def synonyms(text: str):
     """
     final_list = []
     new_text_dic = ast.literal_eval(text)
-    for _, value in new_text_dic.items():
-        doc = synonims(value)
-        for token in doc:
-            if (
-                (token.pos_ == "PROPN" and token.dep_ == "obl")
-                or token.pos_ == "VERB"
-                or token.pos_ == "NOUN"
-            ):
-                syn = synonym_searcher(token.lemma_)
-                if syn[1]:
-                    final_list.append(elastic_formatter(syn[0], syn[1]))
+    original_lang = identify_lang(new_text_dic)
+    if original_lang in synonims.keys():
+        for _, value in new_text_dic.items():
+            doc = synonims[original_lang](value)
+            for token in doc:
+                if (
+                    (token.pos_ == "PROPN" and token.dep_ == "obl")
+                    or token.pos_ == "VERB"
+                    or token.pos_ == "NOUN"
+                ):
+                    syn = synonym_searcher(token.lemma_)
+                    if syn[1]:
+                        final_list.append(elastic_formatter(syn[0], syn[1]))
+
     return final_list
 
 
@@ -208,6 +227,7 @@ def translate_all(text: str, from_lang: str) -> dict or None:
     for available_lang in avaliable_languages:
         # Omite el idioma fuente
         if available_lang != from_lang:
+            translated_text[available_lang] = {}
             for key, value in new_text_dic.items():
                 # Verifica si el valor es una cadena y contiene letras
                 if isinstance(value, str) and re.search(r"[a-zA-Z]", value):
