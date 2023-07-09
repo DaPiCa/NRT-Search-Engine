@@ -1,16 +1,15 @@
 # pylint: disable=import-error
 import ast
 import glob
-import json
 import logging as lg
 import logging.config as lg_conf
 import os
 import pathlib
 import re
 
-import core.translate as translate
 import nltk
 import spacy
+from core import translate
 from fastapi import FastAPI
 from py3langid import classify
 
@@ -48,10 +47,12 @@ for model in models:
         else:
             filename = model.split("/")[-1].split(".")[0]
         lg.info(
-            f"\tInstalling language model: {avaliable_languages[filename.split('_')[0]]} -> {avaliable_languages[filename.split('_')[1]]}"
+            "\tInstalling language model: %s -> %s",
+            avaliable_languages[filename.split("_")[0]],
+            avaliable_languages[filename.split("_")[1]],
         )
     except KeyError:
-        lg.error(f"\tInstalling unsupported language model: {model}")
+        lg.error("\tInstalling unsupported language model: %s", model)
     translate.package.install_from_path(pathlib.Path(model))
 lg.info("Installing Spacy model")
 synonims = spacy.load("es_core_news_md")
@@ -63,10 +64,30 @@ lg.info("API started. Waiting for requests...")
 
 @app.get("/")
 def root():
+    """
+    Esta función devuelve un diccionario que indica el estado de la aplicación.
+
+    Returns:
+        dict: Un diccionario que contiene la clave "status" con el valor "ok".
+
+    """
     return {"status": "ok"}
 
 
 def formatter(string):
+    """
+    Esta función toma una cadena de texto y la formatea según las siguientes reglas:
+
+    - Si la cadena contiene un guión bajo (_), lo reemplaza por un espacio y encierra la cadena entre comillas dobles.
+    - Si la cadena no contiene un guión bajo (_), la devuelve sin cambios.
+
+    Args:
+        string (str): La cadena de texto a formatear.
+
+    Returns:
+        str: La cadena de texto formateada.
+
+    """
     string = str(string)
     if "_" in string:
         string = string.replace("_", " ")
@@ -75,79 +96,94 @@ def formatter(string):
 
 
 def synonym_searcher(word):
-    synonyms = []
+    """
+    Esta función busca sinónimos de una palabra utilizando la biblioteca WordNet.
+
+    Args:
+        word (str): La palabra para la que se buscan sinónimos.
+
+    Returns:
+        tuple: Una tupla que contiene la palabra original formateada y una lista de sinónimos formateados.
+
+    """
+    synonyms_list = []
     synsets = wordnet.synsets(word)
     if synsets is not None:
         for syn in synsets:
-            for l in syn.lemmas():
-                synonyms.append(l.name())
-        synonyms = list(set(synonyms))
-        if word.lower() in [x.lower() for x in synonyms]:
-            lower_list = [x.lower() for x in synonyms]
+            for lemma in syn.lemmas():
+                synonyms_list.append(lemma.name())
+        synonyms_list = list(set(synonyms_list))
+        if word.lower() in [x.lower() for x in synonyms_list]:
+            lower_list = [x.lower() for x in synonyms_list]
             index = lower_list.index(word.lower())
-            synonyms.pop(index)
+            synonyms_list.pop(index)
     new_list = []
-    for words in synonyms:
+    for words in synonyms_list:
         new_list.append(formatter(words))
-    synonyms = new_list
-    return (formatter(word), synonyms)
+    synonyms_list = new_list
+    return (formatter(word), synonyms_list)
 
 
-def elastic_formatter(word, synonyms):
-    aux = ", ".join(synonyms)
-    return f"{aux} => {word}"
+def elastic_formatter(word: str, synonyms_list: list) -> str:
+    """
+    Esta función formatea una palabra y su lista de sinónimos en una cadena de \
+        texto legible para ElasticSearch.
+
+    Args:
+        word (str): La palabra original a formatear.
+        synonyms (list): Una lista de sinónimos de la palabra original.
+
+    Returns:
+        str: Una cadena de texto que contiene la lista de sinónimos formateada y la palabra \
+            original en un formato legible para ElasticSearch.
+
+    """
+    aux = ", ".join(synonyms_list)
+    return f"{word}, {aux}"
 
 
 @app.get("/synonyms")
 def synonyms(text: str):
+    """
+    Esta función busca sinónimos de las palabras en un texto utilizando la biblioteca Spacy y WordNet.
+
+    Args:
+        text (str): El texto para el que se buscan sinónimos.
+
+    Returns:
+        list: Una lista de diccionarios que contienen la palabra original y una lista de sinónimos.
+
+    """
     final_list = []
     new_text_dic = ast.literal_eval(text)
     for _, value in new_text_dic.items():
         doc = synonims(value)
         for token in doc:
-            # Imprimimos toda la información morfológica, sintáctica y semántica que nos proporciona Spacy
-            lg.debug(
-                f"T {token.text}, Lema: {token.lemma_}, POS: {token.pos_}, Tag: {token.tag_}, Dep: {token.dep_}, Shape: {token.shape_}, Alpha: {token.is_alpha}, Stop: {token.is_stop}"
-            )
-            # Identificamos propn y verb
             if (
                 (token.pos_ == "PROPN" and token.dep_ == "obl")
                 or token.pos_ == "VERB"
                 or token.pos_ == "NOUN"
             ):
                 syn = synonym_searcher(token.lemma_)
-                """ Si syn[1] no es una lista vacia añadir a final_list """
-                if syn[1] != []:
+                if syn[1]:
                     final_list.append(elastic_formatter(syn[0], syn[1]))
     return final_list
 
 
 @app.get("/avaliableLanguages")
-def avaliableLanguages():
+def avaliable_languages_f():
+    """
+    Esta función devuelve una lista de los lenguajes disponibles en la aplicación.
+
+    Returns:
+        dict: Un diccionario que contiene los lenguajes disponibles.
+
+    """
     return avaliable_languages
 
 
-from queue import Queue
-import threading
-
-
-def translateText(original: dict, from_lang: str, to_lang: str, result_queue: Queue):
-    translated_text = {}
-
-    # Itera sobre todas las claves y valores en el diccionario original
-    for key, value in original.items():
-        # Verifica si el valor es una cadena y contiene letras
-        if isinstance(value, str) and re.search(r"[a-zA-Z]", value):
-            # Traduce el valor al idioma actual
-            translation = translate.translate(value, from_lang, to_lang)
-            # Agrega el valor traducido al diccionario de texto traducido
-            translated_text[key] = translation
-
-    result_queue.put((to_lang, translated_text))
-
-
 @app.get("/translateAll")
-def translateAll(text: str, from_lang: str) -> dict or None:
+def translate_all(text: str, from_lang: str) -> dict or None:
     """
     Translates a dictionary of text from one language to all other available languages.
 
@@ -168,27 +204,17 @@ def translateAll(text: str, from_lang: str) -> dict or None:
     # Crea un diccionario vacío para almacenar el texto traducido
     translated_text = {}
 
-    result_queue = Queue()
-
-    threads = []
-
     # Itera sobre todos los idiomas disponibles
     for available_lang in avaliable_languages:
         # Omite el idioma fuente
         if available_lang != from_lang:
-            thread = threading.Thread(
-                target=translateText,
-                args=(new_text_dic, from_lang, available_lang, result_queue),
-            )
-            threads.append(thread)
-            thread.start()
-
-    for thread in threads:
-        thread.join()
-
-    while not result_queue.empty():
-        lang, thread_translated_text = result_queue.get()
-        translated_text[lang] = thread_translated_text
+            for key, value in new_text_dic.items():
+                # Verifica si el valor es una cadena y contiene letras
+                if isinstance(value, str) and re.search(r"[a-zA-Z]", value):
+                    # Traduce el valor al idioma actual
+                    translation = translate.translate(value, from_lang, available_lang)
+                    # Agrega el valor traducido al diccionario de texto traducido
+                    translated_text[available_lang][key] = translation
 
     # Devuelve el diccionario de texto traducido
     return translated_text
@@ -206,19 +232,18 @@ def identify_lang(text: str) -> str:
         str: A string representing the language of the given text.
     """
     # Check every value of the dict
-    lg.debug(f"Received request to identify language of {text}")
+    lg.debug("Received request to identify language of %s", text)
     text_dic: dict = ast.literal_eval(text)
-    lg.debug(f"Dict: {text_dic}")
     languages = []
     for value in text_dic.values():
-        lg.debug(f"\tIdentifying language of {value}")
+        lg.debug("\tIdentifying language of %s", value)
         if isinstance(value, str) and re.search(
             r"[a-zA-Z]", value
         ):  # Filtrar solo valores con letras
             language = classify(value)[0]
-            lg.debug(f"\t\tIdentified language: {language} for {value}")
+            lg.debug("\t\tIdentified language: %s for %s", language, value)
             languages.append(language)
     # Return the most common language
-    lg.debug(f"Languages: {languages}")
-    lg.debug(f"Identified language: {max(set(languages), key=languages.count)}")
+    lg.debug("Languages identified: %s", languages)
+    lg.debug("Identified language: %s", max(set(languages), key=languages.count))
     return max(set(languages), key=languages.count)

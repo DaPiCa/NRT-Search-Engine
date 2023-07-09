@@ -146,7 +146,8 @@ def insert(
     lista_sinonimos = []
     try:
         available_languages = requests.get(
-            f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/avaliableLanguages"
+            f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/avaliableLanguages",
+            timeout=None,
         ).json()
     except requests.exceptions.ConnectionError as error:
         lg.error("Connection to NLP API error: %s", error)
@@ -204,7 +205,7 @@ def insert(
             cursor.execute(sql)
             while row := cursor.fetchone():
                 total_rows += 1
-                t0 = time.time()
+                init_time = time.time()
                 doc = {}
                 for i, value in enumerate(row):
                     column = schema[i]
@@ -244,6 +245,7 @@ def insert(
                 original_lang = requests.get(
                     f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/detectLanguage",
                     params=msg,
+                    timeout=None,
                 ).json()
                 if (
                     available_languages != {}
@@ -254,6 +256,7 @@ def insert(
                         multilenguage = requests.get(
                             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
                             params=msg,
+                            timeout=None,
                         ).json()
                         if multilenguage is None:
                             lg.error(
@@ -262,22 +265,23 @@ def insert(
                                 original_lang,
                             )
                             continue
-                        else:
-                            for lang in multilenguage:
-                                elastic_connection.index(
-                                    index=table_name,
-                                    document=multilenguage[lang],
-                                    routing=lang,
-                                )
+
+                        for lang in multilenguage:
+                            elastic_connection.index(
+                                index=table_name,
+                                document=multilenguage[lang],
+                                routing=lang,
+                            )
                         sinonimos = requests.get(
                             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/synonyms",
                             params=msg["text"],
+                            timeout=None,
                         )
                         if sinonimos is None or sinonimos == []:
                             lg.error("Error getting synonyms for %s", msg)
                             continue
-                        else:
-                            lista_sinonimos.extend(sinonimos)
+
+                        lista_sinonimos.extend(sinonimos)
 
                     except requests.exceptions.ConnectionError as error:
                         lg.error("Connection to NLP API error: %s", error)
@@ -289,12 +293,12 @@ def insert(
                         original_lang,
                     )
                     elastic_connection.index(index=table_name, document=doc)
-                t1 = time.time()
-                total_time += t1 - t0
-                lg.info(
-                    "Inserted document from table %s in %s. Average time per row %s. Total rows: %s",
+                end_time = time.time()
+                total_time += end_time - init_time
+                lg.debug(
+                    "Insert document from table %s in %s. Average time per row %s. Total rows: %s",
                     table_name,
-                    t1 - t0,
+                    end_time - init_time,
                     total_time / total_rows,
                     total_rows,
                 )

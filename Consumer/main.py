@@ -27,18 +27,18 @@ El programa se puede ejecutar directamente desde la línea de comandos. El progr
 
 
 import calendar
-import threading
 import json
 import logging as lg
 import logging.config as lg_conf
 import os
 import sys
+import threading
 import time
 
+import requests
 from kafka import KafkaConsumer
 from kafka.consumer.fetcher import ConsumerRecord
 from kafka.errors import NoBrokersAvailable, UnrecognizedBrokerVersion
-import requests
 
 
 def insert(msg: ConsumerRecord) -> None:

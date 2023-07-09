@@ -1,11 +1,34 @@
+# pylint: disable=import-error
+"""
+Este módulo contiene una API RESTful que permite interactuar con una base de datos Elasticsearch.
+
+La API cuenta con tres rutas:
+- /insert: permite insertar datos en Elasticsearch.
+- /modify: permite modificar datos en Elasticsearch.
+- /delete: permite eliminar datos de Elasticsearch.
+
+Cada ruta espera una solicitud POST con un cuerpo JSON que contiene\\
+los datos a insertar, modificar o eliminar.
+
+El módulo también contiene una función para conectarse a Elasticsearch y una función auxiliar para\\
+obtener el ID de un documento en Elasticsearch.
+
+Requiere las siguientes bibliotecas:
+- Flask
+- Flask-CORS
+- elasticsearch
+- logging
+
+"""
+
 import logging as lg
 import logging.config as lg_conf
 import os
 import time
 
-import elasticsearch  # pylint: disable=import-error
-from flask import Flask, Response, jsonify, request  # pylint: disable=import-error
-from flask_cors import CORS  # pylint: disable=import-error
+import elasticsearch
+from flask import Flask, Response, jsonify, request
+from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
