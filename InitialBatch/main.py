@@ -1,11 +1,13 @@
+# pylint: disable=import-error
+
 import logging as lg
 import logging.config as lg_conf
 import os
 import sys
 import time
 
-import elasticsearch  # pylint: disable=import-error
-import mysql.connector  # pylint: disable=import-error
+import elasticsearch
+import mysql.connector
 import requests
 
 
@@ -148,7 +150,7 @@ def insert(
         available_languages = requests.get(
             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/avaliableLanguages",
             timeout=None,
-        ).json()
+        ).json()  # nosec
     except requests.exceptions.ConnectionError as error:
         lg.error("Connection to NLP API error: %s", error)
         available_languages = {}
@@ -246,7 +248,7 @@ def insert(
                     f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/detectLanguage",
                     params=msg,
                     timeout=None,
-                ).json()
+                ).json()  # nosec
                 if (
                     available_languages != {}
                     and original_lang in available_languages.keys()
@@ -257,7 +259,7 @@ def insert(
                             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
                             params=msg,
                             timeout=None,
-                        ).json()
+                        ).json()  # nosec
                         if multilenguage is None:
                             lg.error(
                                 "Error translating %s, language %s not supported",
@@ -276,7 +278,7 @@ def insert(
                             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/synonyms",
                             params=msg["text"],
                             timeout=None,
-                        )
+                        )  # nosec
                         if sinonimos is None or sinonimos == []:
                             lg.error("Error getting synonyms for %s", msg)
                             continue
