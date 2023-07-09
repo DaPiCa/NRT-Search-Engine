@@ -106,7 +106,9 @@ def remove(
                 lg.debug("\tRemoving indexed documents from %s", table[0])
                 table_name = table[0]
                 query = {"query": {"match_all": {}}}
-                elastic_connection.delete_by_query(index=table_name, body=query, wait_for_completion=True)
+                elastic_connection.delete_by_query(
+                    index=table_name, body=query, wait_for_completion=True
+                )
                 lg.debug("\tRemoving index %s", table[0])
                 elastic_connection.indices.delete(index=table_name)
         lg.info("Database removed from ElasticSearch")
@@ -144,8 +146,8 @@ def insert(
     lista_sinonimos = []
     try:
         available_languages = requests.get(
-                        f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/avaliableLanguages"
-                    ).json()
+            f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/avaliableLanguages"
+        ).json()
     except requests.exceptions.ConnectionError as error:
         lg.error("Connection to NLP API error: %s", error)
         available_languages = {}
@@ -241,51 +243,68 @@ def insert(
                 }
                 original_lang = requests.get(
                     f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/detectLanguage",
-                    params=msg
+                    params=msg,
                 ).json()
-                if available_languages != {} and original_lang in available_languages.keys():
+                if (
+                    available_languages != {}
+                    and original_lang in available_languages.keys()
+                ):
                     msg["from_lang"] = original_lang
                     try:
                         multilenguage = requests.get(
                             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
-                            params=msg
+                            params=msg,
                         ).json()
                         if multilenguage is None:
-                            lg.error("Error translating %s, language %s not supported", msg, original_lang)
+                            lg.error(
+                                "Error translating %s, language %s not supported",
+                                msg,
+                                original_lang,
+                            )
                             continue
                         else:
                             for lang in multilenguage:
                                 elastic_connection.index(
-                                    index=table_name, document=multilenguage[lang], routing=lang
+                                    index=table_name,
+                                    document=multilenguage[lang],
+                                    routing=lang,
                                 )
                         sinonimos = requests.get(
                             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/synonyms",
-                            params=msg["text"])
+                            params=msg["text"],
+                        )
                         if sinonimos is None or sinonimos == []:
                             lg.error("Error getting synonyms for %s", msg)
                             continue
                         else:
                             lista_sinonimos.extend(sinonimos)
-                        
+
                     except requests.exceptions.ConnectionError as error:
                         lg.error("Connection to NLP API error: %s", error)
                         elastic_connection.index(index=table_name, document=doc)
                 else:
-                    lg.error("Error translating %s, language %s not supported", msg, original_lang)
+                    lg.error(
+                        "Error translating %s, language %s not supported",
+                        msg,
+                        original_lang,
+                    )
                     elastic_connection.index(index=table_name, document=doc)
                 t1 = time.time()
                 total_time += t1 - t0
-                lg.info("Inserted document from table %s in %s. Average time per row %s. Total rows: %s", table_name, t1 - t0, total_time / total_rows, total_rows)
-        if(lista_sinonimos != []):
+                lg.info(
+                    "Inserted document from table %s in %s. Average time per row %s. Total rows: %s",
+                    table_name,
+                    t1 - t0,
+                    total_time / total_rows,
+                    total_rows,
+                )
+        if lista_sinonimos != []:
             lg.info("Inserting synonyms into ElasticSearch")
             body = {
-                'index': {
-                    'analysis': {
-                        'filter': {
-                            'synonyms': {
-                                'type': 'synonym',
-                                'synonyms': lista_sinonimos
-                            }
+                "index": {
+                    "analysis": {
+                        "filter": {
+                            "synonyms": {"type": "synonym", "synonyms": lista_sinonimos}
                         },
                     },
                 },

@@ -1,3 +1,29 @@
+"""
+Este módulo contiene la implementación de un consumidor de mensajes de Kafka que recibe mensajes de los temas especificados y los procesa según su tipo (insert, update o delete). Los mensajes son enviados a una API RESTful que se encarga de almacenarlos en una base de datos Elasticsearch.
+
+El módulo contiene las siguientes funciones:
+
+    - insert(msg: ConsumerRecord) -> None: Función que recibe un objeto ConsumerRecord y registra un mensaje de inserción.
+    - modification(msg: ConsumerRecord) -> None: Función que recibe un objeto ConsumerRecord y registra un mensaje de modificación.
+    - delete(msg: ConsumerRecord) -> None: Función que recibe un objeto ConsumerRecord y registra un mensaje de eliminación.
+    - received_from_topic(msg: ConsumerRecord) -> None: Función que recibe un objeto ConsumerRecord y ejecuta una función en función del tipo de mensaje recibido.
+    - consume(consumer: KafkaConsumer, topic: str) -> None: Función que consume mensajes de un servidor Kafka.
+    - check_environment_variables() -> None: Función que comprueba si las variables de entorno requeridas están definidas.
+    - create_consumer() -> KafkaConsumer: Función que crea y devuelve un objeto KafkaConsumer para consumir mensajes de Kafka.
+    - start_consumer_service() -> None: Función que inicia el servicio de consumo de mensajes.
+    - main() -> None: Función principal del programa que crea un consumidor de Kafka y consume mensajes de los temas especificados.
+
+El programa se puede ejecutar directamente desde la línea de comandos. El programa espera que las siguientes variables de entorno estén definidas:
+
+    - KAFKA_BROKER: Dirección IP o nombre de host del servidor Kafka.
+    - KAFKA_BROKER_PORT: Puerto del servidor Kafka.
+    - TOPIC_INSERT: Nombre del tema de Kafka para los mensajes de inserción.
+    - TOPIC_UPDATE: Nombre del tema de Kafka para los mensajes de modificación.
+    - TOPIC_DELETE: Nombre del tema de Kafka para los mensajes de eliminación.
+    - API_ELASTIC_HOST: Dirección IP o nombre de host de la API RESTful que se encarga de almacenar los mensajes en Elasticsearch.
+    - API_ELASTIC_PORT: Puerto de la API RESTful que se encarga de almacenar los mensajes en Elasticsearch.
+"""
+
 # pylint: disable=import-error, line-too-long
 
 import calendar
