@@ -1,3 +1,4 @@
+# pylint: disable=import-error, line-too-long
 """
 Este módulo contiene la implementación de un consumidor de mensajes de Kafka que recibe mensajes de los temas especificados y los procesa según su tipo (insert, update o delete). Los mensajes son enviados a una API RESTful que se encarga de almacenarlos en una base de datos Elasticsearch.
 
@@ -24,7 +25,6 @@ El programa se puede ejecutar directamente desde la línea de comandos. El progr
     - API_ELASTIC_PORT: Puerto de la API RESTful que se encarga de almacenar los mensajes en Elasticsearch.
 """
 
-# pylint: disable=import-error, line-too-long
 
 import calendar
 import threading
@@ -249,7 +249,13 @@ def start_consumer_service() -> None:
             threads = []
             for topic in topics:
                 lg.debug("Starting consumer for topic %s", topic)
-                thread = threading.Thread(target=consume, args=(create_consumer(), topic,))
+                thread = threading.Thread(
+                    target=consume,
+                    args=(
+                        create_consumer(),
+                        topic,
+                    ),
+                )
                 threads.append(thread)
                 thread.start()
 
@@ -261,6 +267,7 @@ def start_consumer_service() -> None:
                 # Forzar la terminación de los hilos
                 thread._stop()
             lg.error("Error: %s", err)
+
 
 def main() -> None:
     """Main program function that creates a Kafka consumer and consumes messages from the specified topics.
