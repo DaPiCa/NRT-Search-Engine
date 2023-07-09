@@ -7,7 +7,12 @@ COPY core core
 COPY es_core_news_md-3.5.0-py3-none-any.whl .
 
 RUN pip install -r requirements.txt
-# RUN pip install --upgrade pip
 RUN pip install es_core_news_md-3.5.0-py3-none-any.whl
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8009"]
+ARG NLP_PORT
+ENV NLP_PORT=${NLP_PORT}
+
+HEALTHCHECK --interval=5s --timeout=3s \
+  CMD curl -f http://localhost:$NLP_PORT/ || exit 1
+
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port $NLP_PORT"]

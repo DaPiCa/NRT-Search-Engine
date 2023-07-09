@@ -60,6 +60,11 @@ app = FastAPI()
 lg.info("API started. Waiting for requests...")
 
 
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+
 def formatter(string):
     string = str(string)
     if "_" in string:
@@ -95,25 +100,25 @@ def elastic_formatter(word, synonyms):
 @app.get("/synonyms")
 def synonyms(text: str):
     final_list = []
-    doc = synonims(text)
-    for token in doc:
-        # Imprimimos toda la información morfológica, sintáctica y semántica que nos proporciona Spacy
-        lg.debug(
-            f"T {token.text}, Lema: {token.lemma_}, POS: {token.pos_}, Tag: {token.tag_}, Dep: {token.dep_}, Shape: {token.shape_}, Alpha: {token.is_alpha}, Stop: {token.is_stop}"
-        )
-        # Identificamos propn y verb
-        if (
-            (token.pos_ == "PROPN" and token.dep_ == "obl")
-            or token.pos_ == "VERB"
-            or token.pos_ == "NOUN"
-        ):
-            final_list.append(elastic_formatter(*synonym_searcher(token.lemma_)))
+    new_text_dic = ast.literal_eval(text)
+    for _, value in new_text_dic.items():
+        doc = synonims(value)
+        for token in doc:
+            # Imprimimos toda la información morfológica, sintáctica y semántica que nos proporciona Spacy
+            lg.debug(
+                f"T {token.text}, Lema: {token.lemma_}, POS: {token.pos_}, Tag: {token.tag_}, Dep: {token.dep_}, Shape: {token.shape_}, Alpha: {token.is_alpha}, Stop: {token.is_stop}"
+            )
+            # Identificamos propn y verb
+            if (
+                (token.pos_ == "PROPN" and token.dep_ == "obl")
+                or token.pos_ == "VERB"
+                or token.pos_ == "NOUN"
+            ):
+                syn = synonym_searcher(token.lemma_)
+                """ Si syn[1] no es una lista vacia añadir a final_list """
+                if syn[1] != []:
+                    final_list.append(elastic_formatter(syn[0], syn[1]))
     return final_list
-
-
-@app.get("/healthcheck")
-def healthcheck():
-    return "OK"
 
 
 @app.get("/avaliableLanguages")
@@ -138,6 +143,7 @@ def translateText(original: dict, from_lang: str, to_lang: str, result_queue: Qu
             translated_text[key] = translation
 
     result_queue.put((to_lang, translated_text))
+
 
 @app.get("/translateAll")
 def translateAll(text: str, from_lang: str) -> dict or None:
@@ -169,7 +175,10 @@ def translateAll(text: str, from_lang: str) -> dict or None:
     for available_lang in avaliable_languages:
         # Omite el idioma fuente
         if available_lang != from_lang:
-            thread = threading.Thread(target=translateText, args=(new_text_dic, from_lang, available_lang, result_queue))
+            thread = threading.Thread(
+                target=translateText,
+                args=(new_text_dic, from_lang, available_lang, result_queue),
+            )
             threads.append(thread)
             thread.start()
 

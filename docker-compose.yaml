@@ -171,8 +171,8 @@ services:
           "CMD",
           "curl",
           "-f",
-          "http://localhost:${NLP_PORT}/healthcheck"
+          "http://localhost:${NLP_PORT}"
         ]
-      interval: 30s
+      interval: 5s
       timeout: 30s
-      retries: 30
+      retries: 50

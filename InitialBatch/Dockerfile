@@ -2,7 +2,6 @@ FROM pypy:3.9-7.3.11-slim
 
 COPY main.py .
 COPY requirements.txt .
-COPY scripts.py .
 
 # RUN pip install --upgrade pip
 
