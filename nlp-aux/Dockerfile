@@ -8,11 +8,11 @@ COPY spacy_models spacy_models
 
 RUN pip install -r requirements.txt
 RUN pip install spacy_models/de_core_news_sm-3.6.0-py3-none-any.whl
-RUN pip install spacy_models/en_core_web_sm-3.5.0-py3-none-any.whl
-RUN pip install spacy_models/es_core_news_sm-3.5.0-py3-none-any.whl
-RUN pip install spacy_models/fr_core_news_sm-3.5.0-py3-none-any.whl
-RUN pip install spacy_models/it_core_news_sm-3.5.0-py3-none-any.whl
-RUN pip install spacy_models/pt_core_news_sd-3.5.0-py3-none-any.whl
+RUN pip install spacy_models/en_core_web_sm-3.6.0-py3-none-any.whl
+RUN pip install spacy_models/es_core_news_sm-3.6.0-py3-none-any.whl
+RUN pip install spacy_models/fr_core_news_sm-3.6.0-py3-none-any.whl
+RUN pip install spacy_models/it_core_news_sm-3.6.0-py3-none-any.whl
+RUN pip install spacy_models/pt_core_news_sm-3.6.0-py3-none-any.whl
 
 ARG NLP_PORT
 ENV NLP_PORT=${NLP_PORT}

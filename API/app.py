@@ -60,7 +60,90 @@ def insert_data() -> Response:
                 if elastic_search is None:
                     lg.error("ElasticSearch is not connected")
                     return jsonify({"status": "ElasticSearch is not connected"})
-                resp = elastic_search.index(index=data["table"], body=event)
+                msg = {
+                    "text": str(event),
+                }
+                original_lang = requests.get(
+                    f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/detectLanguage",
+                    params=msg,
+                    timeout=None,
+                ).json()  # nosec
+                if original_lang in avaliable_languages:
+                    msg["from_lang"] = original_lang
+                    try:
+                        multilenguage = requests.get(
+                            f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/translateAll",
+                            params=msg,
+                            timeout=None,
+                        ).json()  # nosec
+                        if multilenguage is None:
+                            lg.error(
+                                "Error translating %s, language %s not supported",
+                                msg,
+                                original_lang,
+                            )
+                            continue
+                        for lang in multilenguage:
+                            elastic_search.index(
+                                index=data["table"],
+                                document=multilenguage[lang],
+                                routing=lang,
+                            )
+                        msg = {
+                            "text": str(event),
+                        }
+                        synonims = requests.get(
+                            f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/synonyms",
+                            params=msg,
+                            timeout=None,
+                        ).json()  # nosec
+                        if synonims is None:
+                            lg.error("Error getting synonims for %s", msg)
+                            resp = elastic_search.index(
+                                index=data["table"], document=event
+                            )
+                            continue
+                        original_synonims = elastic_search.indices.get_settings(
+                            index=data["table"]
+                        )
+                        analysis_settings = original_synonims["my_index"]["settings"][
+                            "index"
+                        ]["analysis"]
+
+                        # Obtener los sinónimos actuales
+                        if (
+                            "filter" in analysis_settings
+                            and "synonyms" in analysis_settings["filter"]
+                        ):
+                            old_synonyms = analysis_settings["filter"]["synonyms"][
+                                "synonyms"
+                            ]
+                            old_synonyms.extend(synonims)
+                        else:
+                            old_synonyms = synonims
+                        elastic_search.indices.close(index=data["table"])
+                        body = {
+                            "index": {
+                                "analysis": {
+                                    "filter": {
+                                        "synonyms": {
+                                            "type": "synonym",
+                                            "synonyms": old_synonyms,
+                                        }
+                                    },
+                                },
+                            },
+                        }
+                        elastic_search.indices.put_settings(
+                            index=data["table"], body=body
+                        )
+                        elastic_search.indices.open(index=data["table"])
+                    except requests.exceptions.ConnectionError as error:
+                        lg.error("Connection to NLP API error: %s", error)
+                        resp = elastic_search.index(index=data["table"], document=event)
+                    except json.decoder.JSONDecodeError as error:
+                        lg.error("Error decoding JSON: %s", error)
+                        resp = elastic_search.index(index=data["table"], document=event)
                 lg.debug("Response from ElasticSearch: %s", resp)
             except elasticsearch.exceptions.ConnectionError as error:
                 lg.error("Connection error: %s", error)

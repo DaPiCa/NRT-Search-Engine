@@ -15,6 +15,7 @@ from py3langid import classify
 
 nltk.download("wordnet", quiet=False)
 nltk.download("omw", quiet=False)
+nltk.download("omw-1.4", quiet=False)
 from nltk.corpus import wordnet
 
 lg_conf.dictConfig(
@@ -111,7 +112,7 @@ def formatter(string):
     return string
 
 
-def synonym_searcher(word):
+def synonym_searcher(word, original_lang):
     """
     Esta función busca sinónimos de una palabra utilizando la biblioteca WordNet.
 
@@ -122,8 +123,15 @@ def synonym_searcher(word):
         tuple: Una tupla que contiene la palabra original formateada y una lista de sinónimos formateados.
 
     """
+    syn = {
+        "en": "eng",
+        "es": "spa",
+        "fr": "fra",
+        "it": "ita",
+        "pt": "por",
+    }
     synonyms_list = []
-    synsets = wordnet.synsets(word)
+    synsets = wordnet.synsets(word, lang=syn[original_lang])
     if synsets is not None:
         for syn in synsets:
             for lemma in syn.lemmas():
@@ -171,8 +179,8 @@ def synonyms_(text: str):
 
     """
     final_list = []
+    original_lang = identify_lang(text)
     new_text_dic = ast.literal_eval(text)
-    original_lang = identify_lang(new_text_dic)
     if original_lang in synonims.keys():
         for _, value in new_text_dic.items():
             doc = synonims[original_lang](value)
@@ -182,7 +190,7 @@ def synonyms_(text: str):
                     or token.pos_ == "VERB"
                     or token.pos_ == "NOUN"
                 ):
-                    syn = synonym_searcher(token.lemma_)
+                    syn = synonym_searcher(token.lemma_, original_lang)
                     if syn[1]:
                         final_list.append(elastic_formatter(syn[0], syn[1]))
 
@@ -214,6 +222,7 @@ def translate_all(text: str, from_lang: str) -> dict or None:
         dict: A dictionary of translated text for each available language.
     """
     # Verifica si el idioma fuente está disponible
+    lg.info("Getting request to translate all text of %s from %s", text, from_lang)
     if from_lang not in avaliable_languages:
         return None
 
@@ -235,8 +244,9 @@ def translate_all(text: str, from_lang: str) -> dict or None:
                     translation = translate.translate(value, from_lang, available_lang)
                     # Agrega el valor traducido al diccionario de texto traducido
                     translated_text[available_lang][key] = translation
-
+    translated_text[from_lang] = new_text_dic
     # Devuelve el diccionario de texto traducido
+    lg.info("Translated text: %s", translated_text)
     return translated_text
 
 

@@ -1,4 +1,4 @@
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `examples` /*!40100 DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci */;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `examples` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE `examples`;
 
@@ -14,6 +14,6 @@ CREATE TABLE `sales` (
 INSERT INTO sales (id, nombre, descripcion, direccion) VALUES
 (1, 'Telefono movil', 'iPhone X en perfectas condiciones', 'Calle Principal, 123'),
 (2, 'Camara digital', 'Nikon D850 con lente 50mm', 'Avenida Central, 456'),
-(3, 'Libro de cocina', 'Recetas saludables para el dia a dia', 'Calle Secundaria, 789'),
+(3, 'Libro de informatica', 'Recetas saludables para el dia a dia', 'Calle Secundaria, 789'),
 (4, 'Bicicleta', 'Marca: Trek, Talla: M', 'Calle Principal, 456'),
 (5, 'Juego de mesa', 'Monopoly edicion especial', 'Avenida Principal, 789');

@@ -159,6 +159,8 @@ def insert(
             break  # Si se obtiene una respuesta exitosa, se sale del bucle
         except requests.exceptions.ConnectionError as error:
             lg.error("Connection to NLP API error: %s", error)
+            lg.error("Retrying in 5 seconds...")
+            time.sleep(5)
     if not available_languages:
         lg.error("NLP API not available. Indexing without synonyms and translations")
     with connector.cursor() as cursor:
@@ -256,6 +258,7 @@ def insert(
                     params=msg,
                     timeout=None,
                 ).json()  # nosec
+                lg.debug("Detected language: %s", original_lang)
                 if (
                     available_languages != {}
                     and original_lang in available_languages.keys()
@@ -275,6 +278,7 @@ def insert(
                             )
                             continue
                         for lang in multilenguage:
+                            lg.debug("Translated to %s: %s", lang, multilenguage[lang])
                             elastic_connection.index(
                                 index=table_name,
                                 document=multilenguage[lang],
@@ -287,7 +291,8 @@ def insert(
                             f"http://{os.getenv('NLP_HOST')}:{os.getenv('NLP_PORT')}/synonyms",
                             params=msg,
                             timeout=None,
-                        )  # nosec
+                        ).json()  # nosec
+                        lg.debug("Sysnonyms: %s", sinonimos)
                         if sinonimos is None or sinonimos == []:
                             lg.error("Error getting synonyms for %s", msg)
                             continue
@@ -320,6 +325,7 @@ def insert(
         lg.info("Synonyms: %s", lista_sinonimos)
         if lista_sinonimos != []:
             lg.info("Inserting synonyms into ElasticSearch")
+            elastic_connection.indices.close(index=table_name)
             body = {
                 "index": {
                     "analysis": {
@@ -330,6 +336,7 @@ def insert(
                 },
             }
             elastic_connection.indices.put_settings(index=table_name, body=body)
+            elastic_connection.indices.open(index=table_name)
             lista_sinonimos = []
 
     conn.close()
@@ -348,7 +355,7 @@ if __name__ == "__main__":
     )
     lg.basicConfig(
         format="%(asctime)s | %(filename)s | %(levelname)s |>> %(message)s",
-        level=lg.INFO,
+        level=lg.DEBUG,
     )
     conn = connect_to_database()
     elastic = connect_to_elastic()
